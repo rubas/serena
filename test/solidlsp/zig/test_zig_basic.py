@@ -51,7 +51,7 @@ class TestZigLanguageServer:
 
         # Should find references including the declaration and usage in main.zig
         assert len(refs) >= 1, "Should find at least the Calculator declaration and references"
-        
+
         # Check if we found references in main.zig (ZLS should support this)
         main_refs = [ref for ref in refs if "main.zig" in ref.get("uri", "")]
         if len(main_refs) == 0:
