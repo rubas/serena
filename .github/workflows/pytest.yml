@@ -111,6 +111,31 @@ jobs:
       - name: Install Ruby language server
         shell: bash
         run: gem install solargraph
+      - name: Install Zig
+        uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.13.0
+      - name: Install ZLS (Zig Language Server)
+        shell: bash
+        run: |
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            wget https://github.com/zigtools/zls/releases/download/0.13.0/zls-x86_64-linux.tar.xz
+            tar -xf zls-x86_64-linux.tar.xz
+            sudo mv zls /usr/local/bin/
+            rm zls-x86_64-linux.tar.xz
+          elif [[ "${{ runner.os }}" == "macOS" ]]; then
+            wget https://github.com/zigtools/zls/releases/download/0.13.0/zls-x86_64-macos.tar.xz
+            tar -xf zls-x86_64-macos.tar.xz
+            sudo mv zls /usr/local/bin/
+            rm zls-x86_64-macos.tar.xz
+          elif [[ "${{ runner.os }}" == "Windows" ]]; then
+            curl -L -o zls.zip https://github.com/zigtools/zls/releases/download/0.13.0/zls-x86_64-windows.zip
+            unzip zls.zip
+            mkdir -p "$HOME/bin"
+            mv zls.exe "$HOME/bin/"
+            echo "$HOME/bin" >> $GITHUB_PATH
+            rm zls.zip
+          fi
       - name: Install uv
         shell: bash
         run: curl -LsSf https://astral.sh/uv/install.sh | sh
