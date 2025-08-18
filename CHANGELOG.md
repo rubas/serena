@@ -1,6 +1,9 @@
 # latest
 Status of the `main` branch. Changes prior to the next official version change will appear here.
 
+* Language servers:
+  * **Add support for Zig** via ZLS (Zig Language Server)
+
 # 0.1.4
 
 ## Summary
