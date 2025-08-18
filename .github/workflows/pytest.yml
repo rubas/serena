@@ -130,7 +130,7 @@ jobs:
             rm zls-x86_64-macos.tar.xz
           elif [[ "${{ runner.os }}" == "Windows" ]]; then
             curl -L -o zls.zip https://github.com/zigtools/zls/releases/download/0.13.0/zls-x86_64-windows.zip
-            unzip zls.zip
+            unzip -o zls.zip
             mkdir -p "$HOME/bin"
             mv zls.exe "$HOME/bin/"
             echo "$HOME/bin" >> $GITHUB_PATH
