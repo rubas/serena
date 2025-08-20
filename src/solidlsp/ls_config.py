@@ -46,6 +46,7 @@ class Language(str, Enum):
     BASH = "bash"
     ZIG = "zig"
     SVELTE = "svelte"
+    LUA = "lua"
     # Experimental or deprecated Language Servers
     TYPESCRIPT_VTS = "typescript_vts"
     """Use the typescript language server through the natively bundled vscode extension via https://github.com/yioneko/vtsls"""
@@ -115,6 +116,8 @@ class Language(str, Enum):
                 return FilenameMatcher("*.zig", "*.zon")
             case self.SVELTE:
                 return FilenameMatcher("*.svelte")
+            case self.LUA:
+                return FilenameMatcher("*.lua")
             case _:
                 raise ValueError(f"Unhandled language: {self}")
 

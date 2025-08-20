@@ -136,6 +136,38 @@ jobs:
             echo "$HOME/bin" >> $GITHUB_PATH
             rm zls.zip
           fi
+      - name: Install Lua Language Server
+        shell: bash
+        run: |
+          LUA_LS_VERSION="3.13.5"
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            if [[ "$(uname -m)" == "x86_64" ]]; then
+              wget https://github.com/LuaLS/lua-language-server/releases/download/${LUA_LS_VERSION}/lua-language-server-${LUA_LS_VERSION}-linux-x64.tar.gz
+              tar -xzf lua-language-server-${LUA_LS_VERSION}-linux-x64.tar.gz
+            else
+              wget https://github.com/LuaLS/lua-language-server/releases/download/${LUA_LS_VERSION}/lua-language-server-${LUA_LS_VERSION}-linux-arm64.tar.gz
+              tar -xzf lua-language-server-${LUA_LS_VERSION}-linux-arm64.tar.gz
+            fi
+            sudo mv bin/lua-language-server /usr/local/bin/
+            rm -rf bin/ lua-language-server-*.tar.gz
+          elif [[ "${{ runner.os }}" == "macOS" ]]; then
+            if [[ "$(uname -m)" == "x86_64" ]]; then
+              wget https://github.com/LuaLS/lua-language-server/releases/download/${LUA_LS_VERSION}/lua-language-server-${LUA_LS_VERSION}-darwin-x64.tar.gz
+              tar -xzf lua-language-server-${LUA_LS_VERSION}-darwin-x64.tar.gz
+            else
+              wget https://github.com/LuaLS/lua-language-server/releases/download/${LUA_LS_VERSION}/lua-language-server-${LUA_LS_VERSION}-darwin-arm64.tar.gz
+              tar -xzf lua-language-server-${LUA_LS_VERSION}-darwin-arm64.tar.gz
+            fi
+            sudo mv bin/lua-language-server /usr/local/bin/
+            rm -rf bin/ lua-language-server-*.tar.gz
+          elif [[ "${{ runner.os }}" == "Windows" ]]; then
+            curl -L -o lua-ls.zip https://github.com/LuaLS/lua-language-server/releases/download/${LUA_LS_VERSION}/lua-language-server-${LUA_LS_VERSION}-win32-x64.zip
+            unzip -o lua-ls.zip
+            mkdir -p "$HOME/bin"
+            mv bin/lua-language-server.exe "$HOME/bin/"
+            echo "$HOME/bin" >> $GITHUB_PATH
+            rm -rf lua-ls.zip bin/
+          fi
       - name: Install uv
         shell: bash
         run: curl -LsSf https://astral.sh/uv/install.sh | sh
