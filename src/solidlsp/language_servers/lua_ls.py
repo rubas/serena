@@ -73,31 +73,32 @@ class LuaLanguageServer(SolidLanguageServer):
         """Download and install lua-language-server if not present."""
         system = platform.system()
         machine = platform.machine().lower()
+        lua_ls_version = "3.15.0"
 
         # Map platform and architecture to download URL
         if system == "Linux":
             if machine in ["x86_64", "amd64"]:
-                download_name = "lua-language-server-3.13.5-linux-x64.tar.gz"
+                download_name = f"lua-language-server-{lua_ls_version}-linux-x64.tar.gz"
             elif machine in ["aarch64", "arm64"]:
-                download_name = "lua-language-server-3.13.5-linux-arm64.tar.gz"
+                download_name = f"lua-language-server-{lua_ls_version}-linux-arm64.tar.gz"
             else:
                 raise RuntimeError(f"Unsupported Linux architecture: {machine}")
         elif system == "Darwin":
             if machine in ["x86_64", "amd64"]:
-                download_name = "lua-language-server-3.13.5-darwin-x64.tar.gz"
+                download_name = f"lua-language-server-{lua_ls_version}-darwin-x64.tar.gz"
             elif machine in ["arm64", "aarch64"]:
-                download_name = "lua-language-server-3.13.5-darwin-arm64.tar.gz"
+                download_name = f"lua-language-server-{lua_ls_version}-darwin-arm64.tar.gz"
             else:
                 raise RuntimeError(f"Unsupported macOS architecture: {machine}")
         elif system == "Windows":
             if machine in ["amd64", "x86_64"]:
-                download_name = "lua-language-server-3.13.5-win32-x64.zip"
+                download_name = f"lua-language-server-{lua_ls_version}-win32-x64.zip"
             else:
                 raise RuntimeError(f"Unsupported Windows architecture: {machine}")
         else:
             raise RuntimeError(f"Unsupported operating system: {system}")
 
-        download_url = f"https://github.com/LuaLS/lua-language-server/releases/download/3.13.5/{download_name}"
+        download_url = f"https://github.com/LuaLS/lua-language-server/releases/download/{lua_ls_version}/{download_name}"
 
         # Create installation directory
         install_dir = Path.home() / ".serena" / "language_servers" / "lua"
