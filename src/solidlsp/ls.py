@@ -243,6 +243,11 @@ class SolidLanguageServer(ABC):
 
             ls = ZigLanguageServer(config, logger, repository_root_path, solidlsp_settings=solidlsp_settings)
 
+        elif config.code_language == Language.SVELTE:
+            from solidlsp.language_servers.svelte_ls import SvelteLanguageServer
+
+            ls = SvelteLanguageServer(config, logger, repository_root_path, solidlsp_settings=solidlsp_settings)
+
         elif config.code_language == Language.NIX:
             from solidlsp.language_servers.nil_ls import NixLanguageServer
 
