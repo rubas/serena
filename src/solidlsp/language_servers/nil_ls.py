@@ -134,6 +134,11 @@ class NixLanguageServer(SolidLanguageServer):
         Check if required Nix runtime dependencies are available.
         Attempts to install nil if not present.
         """
+        # First check if Nix is available (nil might need it at runtime)
+        if not shutil.which("nix"):
+            print("WARNING: Nix is not installed. nil may have limited functionality.")
+            print("Some operations like 'nix flake check' may not work.")
+        
         nil_path = NixLanguageServer._get_nil_path()
 
         if not nil_path:
