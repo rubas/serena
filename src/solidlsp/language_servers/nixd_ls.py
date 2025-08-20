@@ -269,17 +269,13 @@ class NixLanguageServer(SolidLanguageServer):
             ],
             "initializationOptions": {
                 # nixd specific options
-                "nixpkgs": {
-                    "expr": "import <nixpkgs> { }"
-                },
-                "formatting": {
-                    "command": ["nixpkgs-fmt"]  # or ["alejandra"] or ["nixfmt"]
-                },
+                "nixpkgs": {"expr": "import <nixpkgs> { }"},
+                "formatting": {"command": ["nixpkgs-fmt"]},  # or ["alejandra"] or ["nixfmt"]
                 "options": {
                     "enable": True,
                     "target": {
                         "installable": "",  # Will be auto-detected from flake.nix if present
-                    }
+                    },
                 },
             },
         }

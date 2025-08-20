@@ -8,7 +8,6 @@ import pathlib
 import shutil
 import subprocess
 import threading
-import time
 from pathlib import Path
 
 from overrides import override
@@ -231,11 +230,11 @@ class ZigLanguageServer(SolidLanguageServer):
         # ZLS server is typically ready immediately after initialization
         self.server_ready.set()
         self.server_ready.wait()
-    
+
     def _open_workspace_files(self):
         """
         Open all Zig files in the workspace to enable full cross-file reference support.
-        
+
         ZLS only finds references in files that are currently open. By opening all
         .zig files in the workspace during initialization, we enable complete
         cross-file reference functionality.
@@ -243,79 +242,65 @@ class ZigLanguageServer(SolidLanguageServer):
         try:
             workspace_path = Path(self.repository_root_path)
             zig_files = []
-            
+
             self.logger.log("Auto-opening workspace files for ZLS cross-file references", logging.INFO)
-            
+
             # Find all .zig files in the workspace
             for zig_file in workspace_path.rglob("*.zig"):
                 # Skip ignored directories
                 relative_path = zig_file.relative_to(workspace_path)
-                
+
                 # Skip build cache and output directories
                 skip_dirs = {"zig-cache", "zig-out", ".zig-cache", "node_modules", ".git"}
                 if any(part in skip_dirs for part in relative_path.parts):
                     continue
-                
+
                 # Skip if any parent directory should be ignored
                 if any(self.is_ignored_dirname(part) for part in relative_path.parts[:-1]):
                     continue
-                    
+
                 zig_files.append(str(relative_path))
-            
+
             self.logger.log(f"Found {len(zig_files)} Zig files to open", logging.INFO)
-            
+
             # Open each file by sending didOpen notification to ZLS
             for file_path in zig_files:
                 try:
                     full_path = os.path.join(self.repository_root_path, file_path)
-                    
+
                     # Read file content
-                    with open(full_path, 'r', encoding='utf-8') as f:
+                    with open(full_path, encoding="utf-8") as f:
                         content = f.read()
-                    
+
                     # Create URI for the file
                     file_uri = pathlib.Path(full_path).as_uri()
-                    
+
                     # Track this file as opened
-                    self._workspace_files.append({
-                        "uri": file_uri,
-                        "path": file_path
-                    })
-                    
+                    self._workspace_files.append({"uri": file_uri, "path": file_path})
+
                     # Send didOpen notification to ZLS
-                    self.server.notify.did_open({
-                        "textDocument": {
-                            "uri": file_uri,
-                            "languageId": "zig",
-                            "version": 0,
-                            "text": content
-                        }
-                    })
-                    
+                    self.server.notify.did_open({"textDocument": {"uri": file_uri, "languageId": "zig", "version": 0, "text": content}})
+
                     self.logger.log(f"Opened {file_path}", logging.DEBUG)
-                    
+
                 except Exception as e:
                     self.logger.log(f"Failed to open {file_path}: {e}", logging.WARNING)
-            
+
             # Give ZLS time to process the opened files
             if zig_files:
                 import time
+
                 time.sleep(0.5)  # Brief pause to let ZLS index the files
                 self.logger.log(f"Successfully opened {len(self._workspace_files)} workspace files", logging.INFO)
-                
+
         except Exception as e:
             self.logger.log(f"Error opening workspace files: {e}", logging.WARNING)
-    
+
     def __del__(self):
         """Clean up by closing workspace files if they were auto-opened."""
-        if hasattr(self, '_workspace_files') and self._workspace_files:
+        if hasattr(self, "_workspace_files") and self._workspace_files:
             try:
                 for file_info in self._workspace_files:
-                    self.server.notify.did_close({
-                        "textDocument": {
-                            "uri": file_info["uri"]
-                        }
-                    })
+                    self.server.notify.did_close({"textDocument": {"uri": file_info["uri"]}})
             except:
                 pass  # Ignore errors during cleanup
-
