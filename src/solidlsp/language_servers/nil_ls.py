@@ -138,7 +138,7 @@ class NixLanguageServer(SolidLanguageServer):
         if not shutil.which("nix"):
             print("WARNING: Nix is not installed. nil may have limited functionality.")
             print("Some operations like 'nix flake check' may not work.")
-        
+
         nil_path = NixLanguageServer._get_nil_path()
 
         if not nil_path:
