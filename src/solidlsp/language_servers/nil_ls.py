@@ -1,5 +1,7 @@
 """
 Provides Nix specific instantiation of the LanguageServer class using nil (NIx Language server).
+
+Note: Windows is not supported as Nix itself doesn't support Windows natively.
 """
 
 import logging
