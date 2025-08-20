@@ -248,7 +248,7 @@ max-complexity = 20
 "scripts/**" = ["D103"]
 
 [tool.pytest.ini_options]
-addopts = "--snapshot-patch-pycharm-diff"
+# addopts = "--snapshot-patch-pycharm-diff"
 markers = [
   "clojure: language server running for Clojure",
   "python: language server running for Python",
