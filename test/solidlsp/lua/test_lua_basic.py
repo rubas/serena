@@ -5,7 +5,6 @@ These tests validate symbol finding and cross-file reference capabilities
 for Lua modules and functions.
 """
 
-
 import pytest
 
 from solidlsp import SolidLanguageServer
