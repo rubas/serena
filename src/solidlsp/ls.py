@@ -248,6 +248,11 @@ class SolidLanguageServer(ABC):
 
             ls = SvelteLanguageServer(config, logger, repository_root_path, solidlsp_settings=solidlsp_settings)
 
+        elif config.code_language == Language.LUA:
+            from solidlsp.language_servers.lua_ls import LuaLanguageServer
+
+            ls = LuaLanguageServer(config, logger, repository_root_path, solidlsp_settings=solidlsp_settings)
+
         else:
             logger.log(f"Language {config.code_language} is not supported", logging.ERROR)
             raise SolidLSPException(f"Language {config.code_language} is not supported")

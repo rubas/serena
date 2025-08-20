@@ -136,6 +136,51 @@ jobs:
             echo "$HOME/bin" >> $GITHUB_PATH
             rm zls.zip
           fi
+      - name: Install Lua Language Server
+        shell: bash
+        run: |
+          LUA_LS_VERSION="3.15.0"
+          LUA_LS_DIR="$HOME/.serena/language_servers/lua"
+          mkdir -p "$LUA_LS_DIR"
+          
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            if [[ "$(uname -m)" == "x86_64" ]]; then
+              wget https://github.com/LuaLS/lua-language-server/releases/download/${LUA_LS_VERSION}/lua-language-server-${LUA_LS_VERSION}-linux-x64.tar.gz
+              tar -xzf lua-language-server-${LUA_LS_VERSION}-linux-x64.tar.gz -C "$LUA_LS_DIR"
+            else
+              wget https://github.com/LuaLS/lua-language-server/releases/download/${LUA_LS_VERSION}/lua-language-server-${LUA_LS_VERSION}-linux-arm64.tar.gz
+              tar -xzf lua-language-server-${LUA_LS_VERSION}-linux-arm64.tar.gz -C "$LUA_LS_DIR"
+            fi
+            chmod +x "$LUA_LS_DIR/bin/lua-language-server"
+            # Create wrapper script instead of symlink to ensure supporting files are found
+            echo '#!/bin/bash' | sudo tee /usr/local/bin/lua-language-server > /dev/null
+            echo 'cd "${HOME}/.serena/language_servers/lua/bin"' | sudo tee -a /usr/local/bin/lua-language-server > /dev/null
+            echo 'exec ./lua-language-server "$@"' | sudo tee -a /usr/local/bin/lua-language-server > /dev/null
+            sudo chmod +x /usr/local/bin/lua-language-server
+            rm lua-language-server-*.tar.gz
+          elif [[ "${{ runner.os }}" == "macOS" ]]; then
+            if [[ "$(uname -m)" == "x86_64" ]]; then
+              wget https://github.com/LuaLS/lua-language-server/releases/download/${LUA_LS_VERSION}/lua-language-server-${LUA_LS_VERSION}-darwin-x64.tar.gz
+              tar -xzf lua-language-server-${LUA_LS_VERSION}-darwin-x64.tar.gz -C "$LUA_LS_DIR"
+            else
+              wget https://github.com/LuaLS/lua-language-server/releases/download/${LUA_LS_VERSION}/lua-language-server-${LUA_LS_VERSION}-darwin-arm64.tar.gz
+              tar -xzf lua-language-server-${LUA_LS_VERSION}-darwin-arm64.tar.gz -C "$LUA_LS_DIR"
+            fi
+            chmod +x "$LUA_LS_DIR/bin/lua-language-server"
+            # Create wrapper script instead of symlink to ensure supporting files are found
+            echo '#!/bin/bash' | sudo tee /usr/local/bin/lua-language-server > /dev/null
+            echo 'cd "${HOME}/.serena/language_servers/lua/bin"' | sudo tee -a /usr/local/bin/lua-language-server > /dev/null
+            echo 'exec ./lua-language-server "$@"' | sudo tee -a /usr/local/bin/lua-language-server > /dev/null
+            sudo chmod +x /usr/local/bin/lua-language-server
+            rm lua-language-server-*.tar.gz
+          elif [[ "${{ runner.os }}" == "Windows" ]]; then
+            curl -L -o lua-ls.zip https://github.com/LuaLS/lua-language-server/releases/download/${LUA_LS_VERSION}/lua-language-server-${LUA_LS_VERSION}-win32-x64.zip
+            unzip -o lua-ls.zip -d "$LUA_LS_DIR"
+            # For Windows, we'll add the bin directory directly to PATH
+            # The lua-language-server.exe can find its supporting files relative to its location
+            echo "$LUA_LS_DIR/bin" >> $GITHUB_PATH
+            rm lua-ls.zip
+          fi
       - name: Install uv
         shell: bash
         run: curl -LsSf https://astral.sh/uv/install.sh | sh
