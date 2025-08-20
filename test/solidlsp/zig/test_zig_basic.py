@@ -1,8 +1,8 @@
 """
 Basic integration tests for Zig language server functionality.
 
-These tests validate symbol finding capabilities using the Zig Language Server (ZLS).
-Note: ZLS has limited cross-file reference support as of current version.
+These tests validate symbol finding and navigation capabilities using the Zig Language Server (ZLS).
+Note: ZLS v0.14.0 has limited cross-file reference support - find-references only works within the same file.
 """
 
 import os
@@ -16,7 +16,7 @@ from solidlsp.ls_types import SymbolKind
 
 @pytest.mark.zig
 class TestZigLanguageServer:
-    """Test Zig language server symbol finding capabilities."""
+    """Test Zig language server symbol finding and navigation capabilities."""
 
     @pytest.mark.parametrize("language_server", [Language.ZIG], indirect=True)
     def test_find_symbols_in_main(self, language_server: SolidLanguageServer) -> None:
@@ -89,7 +89,7 @@ class TestZigLanguageServer:
 
     @pytest.mark.parametrize("language_server", [Language.ZIG], indirect=True)
     def test_find_references_within_file(self, language_server: SolidLanguageServer) -> None:
-        """Test finding references within the same file."""
+        """Test finding references within the same file (ZLS limitation: only works within file)."""
         file_path = os.path.join("src", "calculator.zig")
         symbols = language_server.request_document_symbols(file_path)
         
@@ -113,8 +113,29 @@ class TestZigLanguageServer:
         
         assert refs is not None
         assert isinstance(refs, list)
-        # ZLS finds multiple references within the same file (declaration and uses)
-        assert len(refs) >= 1, "Should find at least the Calculator declaration"
+        # ZLS finds references within the same file (including declaration with includeDeclaration=True)
+        assert len(refs) >= 5, f"Should find Calculator references within calculator.zig, found {len(refs)}"
+        
+        # All references should be in calculator.zig (ZLS limitation)
+        for ref in refs:
+            assert "calculator.zig" in ref.get("uri", ""), "All references should be within calculator.zig"
+
+    @pytest.mark.parametrize("language_server", [Language.ZIG], indirect=True)
+    def test_go_to_definition_cross_file(self, language_server: SolidLanguageServer) -> None:
+        """Test go-to-definition from main.zig to calculator.zig (this works in ZLS)."""
+        file_path = os.path.join("src", "main.zig")
+        
+        # Line 8: const calc = calculator.Calculator.init();
+        # Test go-to-definition for Calculator
+        definitions = language_server.request_definition(file_path, 7, 25)  # Position of "Calculator"
+        
+        assert definitions is not None
+        assert isinstance(definitions, list)
+        assert len(definitions) > 0, "Should find definition of Calculator"
+        
+        # Should point to calculator.zig
+        calc_def = definitions[0]
+        assert "calculator.zig" in calc_def.get("uri", ""), "Definition should be in calculator.zig"
 
     @pytest.mark.parametrize("language_server", [Language.ZIG], indirect=True)
     def test_hover_information(self, language_server: SolidLanguageServer) -> None:
