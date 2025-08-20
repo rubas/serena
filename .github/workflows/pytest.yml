@@ -115,11 +115,6 @@ jobs:
         uses: goto-bus-stop/setup-zig@v2
         with:
           version: 0.14.1
-      - name: Install Svelte Language Server
-        shell: bash
-        run: |
-          # Node.js is pre-installed on GitHub Actions
-          npm install -g svelte-language-server
       - name: Install ZLS (Zig Language Server)
         shell: bash
         run: |
