@@ -243,13 +243,8 @@ class SolidLanguageServer(ABC):
 
             ls = ZigLanguageServer(config, logger, repository_root_path, solidlsp_settings=solidlsp_settings)
 
-        elif config.code_language == Language.SVELTE:
-            from solidlsp.language_servers.svelte_ls import SvelteLanguageServer
-
-            ls = SvelteLanguageServer(config, logger, repository_root_path, solidlsp_settings=solidlsp_settings)
-
         elif config.code_language == Language.NIX:
-            from solidlsp.language_servers.nil_ls import NixLanguageServer
+            from solidlsp.language_servers.nixd_ls import NixLanguageServer
 
             ls = NixLanguageServer(config, logger, repository_root_path, solidlsp_settings=solidlsp_settings)
 
@@ -707,7 +702,7 @@ class SolidLanguageServer(ABC):
             {
                 "textDocument": {"uri": PathUtils.path_to_uri(os.path.join(self.repository_root_path, relative_file_path))},
                 "position": {"line": line, "character": column},
-                "context": {"includeDeclaration": False},
+                "context": {"includeDeclaration": True},
             }
         )
 
