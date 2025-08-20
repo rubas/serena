@@ -233,3 +233,43 @@ class SvelteLanguageServer(SolidLanguageServer):
         }
 
         return InitializeParams(**initialize_params)
+
+    def _start_server(self):
+        """Start Svelte Language Server process"""
+
+        def register_capability_handler(params):
+            return
+
+        def window_log_message(msg):
+            self.logger.log(f"LSP: window/logMessage: {msg}", logging.INFO)
+
+        def do_nothing(params):
+            return
+
+        self.server.on_request("client/registerCapability", register_capability_handler)
+        self.server.on_notification("window/logMessage", window_log_message)
+        self.server.on_notification("$/progress", do_nothing)
+        self.server.on_notification("textDocument/publishDiagnostics", do_nothing)
+
+        self.logger.log("Starting Svelte Language Server process", logging.INFO)
+        self.server.start()
+        initialize_params = self._get_initialize_params(self.repository_root_path)
+
+        self.logger.log(
+            "Sending initialize request from LSP client to LSP server and awaiting response",
+            logging.INFO,
+        )
+        init_response = self.server.send.initialize(initialize_params)
+
+        # Verify server capabilities
+        assert "textDocumentSync" in init_response["capabilities"]
+        assert "definitionProvider" in init_response["capabilities"]
+        assert "documentSymbolProvider" in init_response["capabilities"]
+        assert "referencesProvider" in init_response["capabilities"]
+
+        self.server.notify.initialized({})
+        self.completions_available.set()
+
+        # Svelte Language Server is typically ready immediately after initialization
+        self.server_ready.set()
+        self.server_ready.wait()
