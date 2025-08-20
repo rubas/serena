@@ -153,15 +153,22 @@ class ZigLanguageServer(SolidLanguageServer):
             ],
             "initializationOptions": {
                 # ZLS specific options based on schema.json
+                # Critical paths for ZLS to understand the project
+                "zig_exe_path": shutil.which("zig"),  # Path to zig executable
+                "zig_lib_path": None,  # Let ZLS auto-detect
+                "build_runner_path": None,  # Let ZLS use its built-in runner
+                "global_cache_path": None,  # Let ZLS use default cache
+                # Build configuration
+                "enable_build_on_save": True,  # Enable to analyze project structure
+                "build_on_save_args": ["build"],
+                # Features
                 "enable_snippets": True,
                 "enable_argument_placeholders": True,
-                "enable_build_on_save": False,  # Disable auto-build to avoid interference
-                "build_on_save_args": [],
                 "semantic_tokens": "full",
                 "warn_style": False,
                 "highlight_global_var_declarations": False,
                 "skip_std_references": False,
-                "prefer_ast_check_as_child_process": False,
+                "prefer_ast_check_as_child_process": True,
                 "completion_label_details": True,
                 # Inlay hints configuration
                 "inlay_hints_show_variable_type_hints": True,

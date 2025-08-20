@@ -2,7 +2,7 @@
 Basic integration tests for Zig language server functionality.
 
 These tests validate symbol finding and navigation capabilities using the Zig Language Server (ZLS).
-Note: ZLS v0.14.0 has limited cross-file reference support - find-references only works within the same file.
+Note: ZLS requires files to be open in the editor to find cross-file references (performance optimization).
 """
 
 import os
@@ -89,7 +89,7 @@ class TestZigLanguageServer:
 
     @pytest.mark.parametrize("language_server", [Language.ZIG], indirect=True)
     def test_find_references_within_file(self, language_server: SolidLanguageServer) -> None:
-        """Test finding references within the same file (ZLS limitation: only works within file)."""
+        """Test finding references within the same file."""
         file_path = os.path.join("src", "calculator.zig")
         symbols = language_server.request_document_symbols(file_path)
         
@@ -115,14 +115,55 @@ class TestZigLanguageServer:
         assert isinstance(refs, list)
         # ZLS finds references within the same file (including declaration with includeDeclaration=True)
         assert len(refs) >= 5, f"Should find Calculator references within calculator.zig, found {len(refs)}"
+
+    @pytest.mark.parametrize("language_server", [Language.ZIG], indirect=True)
+    def test_cross_file_references_with_open_files(self, language_server: SolidLanguageServer) -> None:
+        """Test finding cross-file references (requires files to be open in ZLS)."""
+        import time
         
-        # All references should be in calculator.zig (ZLS limitation)
-        for ref in refs:
-            assert "calculator.zig" in ref.get("uri", ""), "All references should be within calculator.zig"
+        # ZLS only searches for references in open files (performance optimization)
+        # So we need to open the files that contain references
+        
+        # Open build.zig first to trigger project analysis
+        with language_server.open_file("build.zig"):
+            # Open the source files we want to search
+            with language_server.open_file(os.path.join("src", "main.zig")):
+                with language_server.open_file(os.path.join("src", "calculator.zig")):
+                    # Give ZLS a moment to analyze the open files
+                    time.sleep(1)
+                    
+                    # Now find references to Calculator
+                    symbols = language_server.request_document_symbols(os.path.join("src", "calculator.zig"))
+                    symbol_list = symbols[0] if isinstance(symbols, tuple) else symbols
+                    
+                    calculator_symbol = None
+                    for sym in symbol_list:
+                        if sym.get("name") == "Calculator":
+                            calculator_symbol = sym
+                            break
+                    
+                    assert calculator_symbol is not None, "Calculator struct not found"
+                    
+                    sel_range = calculator_symbol.get("selectionRange", calculator_symbol.get("range"))
+                    assert sel_range is not None, "Calculator symbol has no range information"
+                    
+                    sel_start = sel_range["start"]
+                    refs = language_server.request_references(
+                        os.path.join("src", "calculator.zig"), 
+                        sel_start["line"], 
+                        sel_start["character"]
+                    )
+                    
+                    assert refs is not None
+                    assert isinstance(refs, list)
+                    
+                    # With files open, ZLS should find cross-file references
+                    main_refs = [ref for ref in refs if "main.zig" in ref.get("uri", "")]
+                    assert len(main_refs) > 0, "Should find Calculator references in main.zig when files are open"
 
     @pytest.mark.parametrize("language_server", [Language.ZIG], indirect=True)
     def test_go_to_definition_cross_file(self, language_server: SolidLanguageServer) -> None:
-        """Test go-to-definition from main.zig to calculator.zig (this works in ZLS)."""
+        """Test go-to-definition from main.zig to calculator.zig (works without opening files)."""
         file_path = os.path.join("src", "main.zig")
         
         # Line 8: const calc = calculator.Calculator.init();
