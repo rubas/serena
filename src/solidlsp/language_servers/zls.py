@@ -8,6 +8,8 @@ import pathlib
 import shutil
 import subprocess
 import threading
+import time
+from pathlib import Path
 
 from overrides import override
 
@@ -221,3 +223,4 @@ class ZigLanguageServer(SolidLanguageServer):
         # ZLS server is typically ready immediately after initialization
         self.server_ready.set()
         self.server_ready.wait()
+

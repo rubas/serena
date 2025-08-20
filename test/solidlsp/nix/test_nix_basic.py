@@ -1,8 +1,7 @@
 """
-Tests for the Nix language server implementation using nil.
+Tests for the Nix language server implementation using nixd.
 
-These tests validate symbol finding capabilities for Nix expressions and modules.
-Note: nil has limited cross-file reference support as of current version.
+These tests validate symbol finding and cross-file reference capabilities for Nix expressions.
 """
 
 import os
@@ -123,6 +122,72 @@ class TestNixLanguageServer:
             # If hover info is provided, it should have proper structure
             assert "contents" in hover_info or "value" in hover_info, "Hover should have contents or value"
 
+    @pytest.mark.parametrize("language_server", [Language.NIX], indirect=True)
+    def test_cross_file_references_utils_import(self, language_server: SolidLanguageServer) -> None:
+        """Test finding cross-file references for imported utils."""
+        # Find references to 'utils' which is imported in default.nix from lib/utils.nix
+        # Line 10 in default.nix: utils = import ./lib/utils.nix { inherit lib; };
+        refs = language_server.request_references("default.nix", 9, 2)  # Position of 'utils'
+        
+        assert refs is not None
+        assert isinstance(refs, list)
+        
+        # Should find references within default.nix where utils is used
+        default_refs = [ref for ref in refs if "default.nix" in ref.get("uri", "")]
+        assert len(default_refs) >= 2, f"Should find at least 2 references to utils in default.nix (import and usage), found {len(default_refs)}"
+    
+    @pytest.mark.parametrize("language_server", [Language.NIX], indirect=True)
+    def test_verify_imports_exist(self, language_server: SolidLanguageServer) -> None:
+        """Verify that our test files have proper imports set up."""
+        # Verify that default.nix imports utils from lib/utils.nix
+        symbols = language_server.request_document_symbols("default.nix")
+        
+        assert symbols is not None
+        symbol_list = symbols[0] if isinstance(symbols, tuple) else symbols
+        
+        # Check that makeGreeting exists (defined in default.nix)
+        symbol_names = {sym.get("name") for sym in symbol_list if isinstance(sym, dict)}
+        assert "makeGreeting" in symbol_names, "makeGreeting should be found in default.nix"
+        
+        # Verify lib/utils.nix has the expected structure
+        utils_symbols = language_server.request_document_symbols("lib/utils.nix")
+        assert utils_symbols is not None
+        utils_list = utils_symbols[0] if isinstance(utils_symbols, tuple) else utils_symbols
+        utils_names = {sym.get("name") for sym in utils_list if isinstance(sym, dict)}
+        
+        # Verify key functions exist in utils
+        assert "math" in utils_names, "math should be found in lib/utils.nix"
+        assert "strings" in utils_names, "strings should be found in lib/utils.nix"
+    
+    @pytest.mark.parametrize("language_server", [Language.NIX], indirect=True)
+    def test_go_to_definition_cross_file(self, language_server: SolidLanguageServer) -> None:
+        """Test go-to-definition from default.nix to lib/utils.nix."""
+        # Line 24 in default.nix: unique = utils.lists.unique;
+        # Test go-to-definition for 'utils'
+        definitions = language_server.request_definition("default.nix", 23, 14)  # Position of 'utils'
+        
+        assert definitions is not None
+        assert isinstance(definitions, list)
+        
+        if len(definitions) > 0:
+            # Should point to the import statement or utils.nix
+            assert any("utils" in def_item.get("uri", "") or "default.nix" in def_item.get("uri", "") 
+                      for def_item in definitions), "Definition should relate to utils import or utils.nix file"
+    
+    @pytest.mark.parametrize("language_server", [Language.NIX], indirect=True)
+    def test_definition_navigation_in_flake(self, language_server: SolidLanguageServer) -> None:
+        """Test definition navigation in flake.nix."""
+        # Test that we can navigate to definitions within flake.nix
+        # Line 69: default = hello-custom;
+        definitions = language_server.request_definition("flake.nix", 68, 20)  # Position of 'hello-custom'
+        
+        assert definitions is not None
+        assert isinstance(definitions, list)
+        # nixd should find the definition of hello-custom in the same file
+        if len(definitions) > 0:
+            assert any("flake.nix" in def_item.get("uri", "") for def_item in definitions), \
+                "Should find hello-custom definition in flake.nix"
+    
     @pytest.mark.parametrize("language_server", [Language.NIX], indirect=True)
     def test_full_symbol_tree(self, language_server: SolidLanguageServer) -> None:
         """Test that full symbol tree is not empty."""

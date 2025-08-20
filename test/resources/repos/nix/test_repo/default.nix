@@ -6,10 +6,13 @@ let
   lib = pkgs.lib;
   stdenv = pkgs.stdenv;
   
+  # Import our custom utilities
+  utils = import ./lib/utils.nix { inherit lib; };
+  
   # Custom function to create a greeting
   makeGreeting = name: "Hello, ${name}!";
   
-  # List manipulation functions
+  # List manipulation functions (using imported utils)
   listUtils = {
     double = list: map (x: x * 2) list;
     sum = list: lib.foldl' (acc: x: acc + x) 0 list;
@@ -17,6 +20,8 @@ let
       if list == [] 
       then 0 
       else (listUtils.sum list) / (builtins.length list);
+    # Use function from imported utils
+    unique = utils.lists.unique;
   };
   
   # String utilities
@@ -59,6 +64,9 @@ let
 in rec {
   # Export utilities
   inherit listUtils stringUtils makeGreeting;
+  
+  # Export imported utilities directly
+  inherit (utils) math strings;
   
   # Example packages
   hello = buildSimplePackage {
