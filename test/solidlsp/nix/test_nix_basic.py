@@ -2,6 +2,7 @@
 Tests for the Nix language server implementation using nil.
 """
 
+import platform
 from pathlib import Path
 
 import pytest
@@ -9,6 +10,12 @@ import pytest
 from solidlsp.ls import SolidLanguageServer
 from solidlsp.ls_config import Language, LanguageServerConfig
 from solidlsp.ls_logger import LanguageServerLogger
+
+# Skip all Nix tests on Windows as Nix doesn't support Windows
+pytestmark = pytest.mark.skipif(
+    platform.system() == "Windows",
+    reason="Nix and nil are not available on Windows"
+)
 
 
 @pytest.fixture(scope="module")
