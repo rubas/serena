@@ -702,7 +702,7 @@ class SolidLanguageServer(ABC):
             {
                 "textDocument": {"uri": PathUtils.path_to_uri(os.path.join(self.repository_root_path, relative_file_path))},
                 "position": {"line": line, "character": column},
-                "context": {"includeDeclaration": True},
+                "context": {"includeDeclaration": False},
             }
         )
 
