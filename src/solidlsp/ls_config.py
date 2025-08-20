@@ -45,7 +45,6 @@ class Language(str, Enum):
     SWIFT = "swift"
     BASH = "bash"
     ZIG = "zig"
-    SVELTE = "svelte"
     LUA = "lua"
     NIX = "nix"
     # Experimental or deprecated Language Servers
@@ -115,8 +114,6 @@ class Language(str, Enum):
                 return FilenameMatcher("*.sh", "*.bash")
             case self.ZIG:
                 return FilenameMatcher("*.zig", "*.zon")
-            case self.SVELTE:
-                return FilenameMatcher("*.svelte")
             case self.LUA:
                 return FilenameMatcher("*.lua")
             case self.NIX:
