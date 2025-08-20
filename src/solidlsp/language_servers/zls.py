@@ -259,6 +259,7 @@ class ZigLanguageServer(SolidLanguageServer):
                 if any(self.is_ignored_dirname(part) for part in relative_path.parts[:-1]):
                     continue
 
+                # Store the relative path as string (will use platform-specific separators)
                 zig_files.append(str(relative_path))
 
             self.logger.log(f"Found {len(zig_files)} Zig files to open", logging.INFO)
