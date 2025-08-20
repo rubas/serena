@@ -265,6 +265,7 @@ markers = [
   "snapshot: snapshot tests for symbolic editing operations",
   "ruby: language server running for Ruby",
   "zig: language server running for Zig",
+  "svelte: language server running for Svelte",
 ]
 
 [tool.codespell]
