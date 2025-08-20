@@ -267,6 +267,7 @@ markers = [
   "zig: language server running for Zig",
   "svelte: language server running for Svelte",
   "lua: language server running for Lua",
+  "nix: language server running for Nix",
 ]
 
 [tool.codespell]

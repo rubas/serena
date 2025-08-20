@@ -181,6 +181,30 @@ jobs:
             echo "$LUA_LS_DIR/bin" >> $GITHUB_PATH
             rm lua-ls.zip
           fi
+      - name: Install Nix
+        if: runner.os != 'Windows'  # Nix doesn't support Windows natively
+        uses: cachix/install-nix-action@v30
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - name: Install nil (Nix Language Server)
+        if: runner.os != 'Windows'  # Skip on Windows since Nix isn't available
+        shell: bash
+        run: |
+          # Ensure cargo bin is in PATH first
+          export PATH="$HOME/.cargo/bin:$PATH"
+          
+          # Install using cargo (Rust is available on GitHub Actions by default)
+          # nil requires Nix to be installed during build
+          cargo install --git https://github.com/oxalica/nil nil
+          
+          # Verify nil is installed and working
+          if ! command -v nil &> /dev/null; then
+            echo "nil installation failed or not in PATH"
+            exit 1
+          fi
+          
+          # Add cargo bin to PATH for subsequent steps
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - name: Install uv
         shell: bash
         run: curl -LsSf https://astral.sh/uv/install.sh | sh
