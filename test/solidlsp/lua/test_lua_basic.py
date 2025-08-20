@@ -38,10 +38,10 @@ class TestLuaLanguageServer:
                 if symbol.get("kind") == SymbolKind.Function:
                     function_names.add(name)
         
-        # Verify specific calculator functions exist
+        # Verify exact calculator functions exist
         expected_functions = {"add", "subtract", "multiply", "divide", "factorial"}
         found_functions = function_names & expected_functions
-        assert len(found_functions) >= 4, f"Expected at least 4 of {expected_functions}, found {found_functions}"
+        assert found_functions == expected_functions, f"Expected exactly {expected_functions}, found {found_functions}"
         
         # Verify specific functions
         assert "add" in function_names, "add function not found"
@@ -70,15 +70,15 @@ class TestLuaLanguageServer:
                 if symbol.get("kind") == SymbolKind.Function:
                     function_names.add(name)
         
-        # Verify string utility functions
+        # Verify exact string utility functions
         expected_utils = {"trim", "split", "starts_with", "ends_with"}
         found_utils = function_names & expected_utils
-        assert len(found_utils) >= 3, f"Expected at least 3 of {expected_utils}, found {found_utils}"
+        assert found_utils == expected_utils, f"Expected exactly {expected_utils}, found {found_utils}"
         
-        # Verify table utility functions
+        # Verify exact table utility functions
         table_utils = {"deep_copy", "table_contains", "table_merge"}
         found_table_utils = function_names & table_utils
-        assert len(found_table_utils) >= 2, f"Expected table utilities {table_utils}, found {found_table_utils}"
+        assert found_table_utils == table_utils, f"Expected exactly {table_utils}, found {found_table_utils}"
         
         # Check for Logger class/table
         assert "Logger" in all_symbols or any("Logger" in s for s in all_symbols), "Logger not found in symbols"
@@ -98,10 +98,10 @@ class TestLuaLanguageServer:
             if isinstance(symbol, dict) and symbol.get("kind") == SymbolKind.Function:
                 function_names.add(symbol.get("name", ""))
         
-        # Verify main functions exist
+        # Verify exact main functions exist
         expected_funcs = {"print_banner", "test_calculator", "test_utils"}
         found_funcs = function_names & expected_funcs
-        assert len(found_funcs) >= 2, f"Expected at least 2 of {expected_funcs}, found {found_funcs}"
+        assert found_funcs == expected_funcs, f"Expected exactly {expected_funcs}, found {found_funcs}"
         
         assert "test_calculator" in function_names, "test_calculator function not found"
         assert "test_utils" in function_names, "test_utils function not found"
@@ -134,7 +134,24 @@ class TestLuaLanguageServer:
         
         assert refs is not None
         assert isinstance(refs, list)
-        assert len(refs) >= 1, "Should find at least the add function declaration"
+        # add function appears in: declaration (line 6), main.lua (lines 16, 71), test_calculator.lua (lines 22, 23, 24)
+        assert len(refs) == 6, f"Should find exactly 6 references to calculator.add, found {len(refs)}"
+        
+        # Verify exact reference locations
+        ref_files = {}
+        for ref in refs:
+            filename = ref.get("uri", "").split("/")[-1]
+            if filename not in ref_files:
+                ref_files[filename] = []
+            ref_files[filename].append(ref["range"]["start"]["line"])
+        
+        # Check calculator.lua has the declaration
+        assert "calculator.lua" in ref_files, "Should find add declaration in calculator.lua"
+        assert 5 in ref_files["calculator.lua"], f"add declaration should be at line 6 (0-indexed: 5), found at {ref_files['calculator.lua']}"
+        
+        # Check main.lua has usages
+        assert "main.lua" in ref_files, "Should find add usages in main.lua"
+        assert 15 in ref_files["main.lua"] or 70 in ref_files["main.lua"], f"Should find add usage in main.lua, found at lines {ref_files.get('main.lua', [])}"
         
         # Check for cross-file references from main.lua
         main_refs = [ref for ref in refs if "main.lua" in ref.get("uri", "")]
@@ -168,7 +185,24 @@ class TestLuaLanguageServer:
         
         assert refs is not None
         assert isinstance(refs, list)
-        assert len(refs) >= 1, "Should find at least the trim function declaration"
+        # trim function appears in: declaration (line 6 in utils.lua), usage (line 32 in main.lua)
+        assert len(refs) >= 2, f"Should find at least 2 references to utils.trim, found {len(refs)}"
+        
+        # Verify exact reference locations
+        ref_files = {}
+        for ref in refs:
+            filename = ref.get("uri", "").split("/")[-1]
+            if filename not in ref_files:
+                ref_files[filename] = []
+            ref_files[filename].append(ref["range"]["start"]["line"])
+        
+        # Check utils.lua has the declaration
+        assert "utils.lua" in ref_files, "Should find trim declaration in utils.lua"
+        assert 5 in ref_files["utils.lua"], f"trim declaration should be at line 6 (0-indexed: 5), found at {ref_files['utils.lua']}"
+        
+        # Check main.lua has usage
+        assert "main.lua" in ref_files, "Should find trim usage in main.lua"
+        assert 31 in ref_files["main.lua"], f"Should find trim usage at line 32 (0-indexed: 31) in main.lua, found at lines {ref_files.get('main.lua', [])}"
         
         # Check for cross-file references from main.lua
         main_refs = [ref for ref in refs if "main.lua" in ref.get("uri", "")]

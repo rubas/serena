@@ -66,10 +66,10 @@ class TestZigLanguageServer:
                 for child in sym["children"]:
                     all_symbols.append(child.get("name"))
         
-        # Verify at least some calculator methods exist
+        # Verify exact calculator methods exist
         expected_methods = {"init", "add", "subtract", "multiply", "divide"}
         found_methods = set(all_symbols) & expected_methods
-        assert len(found_methods) >= 2, f"Expected at least 2 Calculator methods, found: {found_methods}"
+        assert found_methods == expected_methods, f"Expected exactly {expected_methods}, found: {found_methods}"
 
     @pytest.mark.parametrize("language_server", [Language.ZIG], indirect=True)
     def test_find_symbols_in_math_utils(self, language_server: SolidLanguageServer) -> None:
@@ -114,7 +114,13 @@ class TestZigLanguageServer:
         assert refs is not None
         assert isinstance(refs, list)
         # ZLS finds references within the same file (including declaration with includeDeclaration=True)
-        assert len(refs) >= 5, f"Should find Calculator references within calculator.zig, found {len(refs)}"
+        # Calculator is used in: declaration (line 8), and 4 test usages (lines 45, 51, 57, 63)
+        assert len(refs) == 5, f"Should find exactly 5 Calculator references within calculator.zig, found {len(refs)}"
+        
+        # Verify exact reference locations
+        ref_lines = sorted([ref["range"]["start"]["line"] for ref in refs])
+        expected_lines = [7, 44, 50, 56, 62]  # 0-indexed: declaration at line 8 (index 7), tests at 45, 51, 57, 63
+        assert ref_lines == expected_lines, f"Expected references at lines {expected_lines}, found at {ref_lines}"
 
     @pytest.mark.parametrize("language_server", [Language.ZIG], indirect=True)
     def test_cross_file_references_with_open_files(self, language_server: SolidLanguageServer) -> None:
@@ -161,7 +167,12 @@ class TestZigLanguageServer:
                     
                     # With files open, ZLS finds cross-file references
                     main_refs = [ref for ref in refs if "main.zig" in ref.get("uri", "")]
-                    assert len(main_refs) > 0, "Should find Calculator references in main.zig when files are open"
+                    assert len(main_refs) == 1, f"Should find exactly 1 Calculator reference in main.zig, found {len(main_refs)}"
+                    
+                    # Verify exact location in main.zig (line 8, 0-indexed: 7)
+                    if main_refs:
+                        main_ref_line = main_refs[0]["range"]["start"]["line"]
+                        assert main_ref_line == 7, f"Calculator reference in main.zig should be at line 8 (0-indexed: 7), found at line {main_ref_line + 1}"
 
     @pytest.mark.parametrize("language_server", [Language.ZIG], indirect=True)
     def test_cross_file_references_within_file(self, language_server: SolidLanguageServer) -> None:
@@ -198,7 +209,13 @@ class TestZigLanguageServer:
         assert isinstance(refs, list)
         
         # ZLS finds references within the same file
-        assert len(refs) >= 5, f"Should find Calculator references within calculator.zig, found {len(refs)}"
+        # Calculator is used in: declaration (line 8), and 4 test usages (lines 45, 51, 57, 63)
+        assert len(refs) == 5, f"Should find exactly 5 Calculator references within calculator.zig, found {len(refs)}"
+        
+        # Verify exact reference locations
+        ref_lines = sorted([ref["range"]["start"]["line"] for ref in refs])
+        expected_lines = [7, 44, 50, 56, 62]  # 0-indexed: declaration at line 8 (index 7), tests at 45, 51, 57, 63
+        assert ref_lines == expected_lines, f"Expected references at lines {expected_lines}, found at {ref_lines}"
 
     @pytest.mark.parametrize("language_server", [Language.ZIG], indirect=True)
     def test_go_to_definition_cross_file(self, language_server: SolidLanguageServer) -> None:

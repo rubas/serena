@@ -36,10 +36,10 @@ class TestNixLanguageServer:
         # Verify specific function exists
         assert "makeGreeting" in symbol_names, "makeGreeting function not found"
         
-        # Verify attribute sets are found
+        # Verify exact attribute sets are found
         expected_attrs = {"listUtils", "stringUtils"}
         found_attrs = symbol_names & expected_attrs
-        assert len(found_attrs) >= 2, f"Expected {expected_attrs}, found {found_attrs}"
+        assert found_attrs == expected_attrs, f"Expected exactly {expected_attrs}, found {found_attrs}"
 
     @pytest.mark.parametrize("language_server", [Language.NIX], indirect=True)
     def test_find_symbols_in_utils(self, language_server: SolidLanguageServer) -> None:
@@ -52,10 +52,10 @@ class TestNixLanguageServer:
         symbol_list = symbols[0] if isinstance(symbols, tuple) else symbols
         symbol_names = {sym.get("name") for sym in symbol_list if isinstance(sym, dict)}
         
-        # Verify utility modules are found
+        # Verify exact utility modules are found
         expected_modules = {"math", "strings", "lists", "attrs"}
         found_modules = symbol_names & expected_modules
-        assert len(found_modules) >= 3, f"Expected at least 3 of {expected_modules}, found {found_modules}"
+        assert found_modules == expected_modules, f"Expected exactly {expected_modules}, found {found_modules}"
 
     @pytest.mark.parametrize("language_server", [Language.NIX], indirect=True)
     def test_find_symbols_in_flake(self, language_server: SolidLanguageServer) -> None:
@@ -108,7 +108,14 @@ class TestNixLanguageServer:
         
         assert refs is not None
         assert isinstance(refs, list)
-        assert len(refs) >= 1, "Should find at least the makeGreeting declaration"
+        # nixd finds at least the inherit statement (line 66)
+        assert len(refs) >= 1, f"Should find at least 1 reference to makeGreeting, found {len(refs)}"
+        
+        # Verify makeGreeting is referenced at expected locations
+        if refs:
+            ref_lines = sorted([ref["range"]["start"]["line"] for ref in refs])
+            # Check if we found the inherit (line 66, 0-indexed: 65)
+            assert 65 in ref_lines, f"Should find makeGreeting inherit at line 66, found at lines {[l+1 for l in ref_lines]}"
 
     @pytest.mark.parametrize("language_server", [Language.NIX], indirect=True)
     def test_hover_information(self, language_server: SolidLanguageServer) -> None:
@@ -134,7 +141,14 @@ class TestNixLanguageServer:
         
         # Should find references within default.nix where utils is used
         default_refs = [ref for ref in refs if "default.nix" in ref.get("uri", "")]
-        assert len(default_refs) >= 2, f"Should find at least 2 references to utils in default.nix (import and usage), found {len(default_refs)}"
+        # utils is: imported (line 10), used in listUtils.unique (line 24), inherited in exports (line 69)
+        assert len(default_refs) >= 2, f"Should find at least 2 references to utils in default.nix, found {len(default_refs)}"
+        
+        # Verify utils is referenced at expected locations (0-indexed)
+        if default_refs:
+            ref_lines = sorted([ref["range"]["start"]["line"] for ref in default_refs])
+            # Check for key references - at least the import (line 10) or usage (line 24)
+            assert 9 in ref_lines or 23 in ref_lines, f"Should find utils import or usage, found references at lines {[l+1 for l in ref_lines]}"
     
     @pytest.mark.parametrize("language_server", [Language.NIX], indirect=True)
     def test_verify_imports_exist(self, language_server: SolidLanguageServer) -> None:
