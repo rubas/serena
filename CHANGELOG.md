@@ -3,9 +3,8 @@ Status of the `main` branch. Changes prior to the next official version change w
 
 * Language servers:
   * **Add support for Zig** via ZLS (Zig Language Server)
-  * **Add support for Svelte** via svelte-language-server (automatically installed via npm if not present)
   * **Add support for Lua** via lua-language-server (automatically downloaded if not installed)
-  * **Add support for Nix** via nil (NIx Language server) - requires nil installation or cargo to build from source (Windows not supported)
+  * **Add support for Nix** via nixd (Nix Language server) - requires nixd installation (Windows not supported)
 
 # 0.1.4
 
