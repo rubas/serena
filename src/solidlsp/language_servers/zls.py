@@ -294,8 +294,8 @@ class ZigLanguageServer(SolidLanguageServer):
                 import platform
                 import time
 
-                # Windows needs more time for ZLS to process opened files
-                wait_time = 2.0 if platform.system() == "Windows" else 0.5
+                # Windows needs significantly more time for ZLS to process opened files
+                wait_time = 5.0 if platform.system() == "Windows" else 0.5
                 time.sleep(wait_time)  # Let ZLS index the files
                 self.logger.log(f"Successfully opened {len(self._workspace_files)} workspace files", logging.INFO)
 
