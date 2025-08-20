@@ -217,9 +217,17 @@ class SvelteLanguageServer(SolidLanguageServer):
             node_cmd = shutil.which("node") or shutil.which("nodejs")
             if not node_cmd:
                 raise RuntimeError("Node.js executable not found in PATH")
-            cmd = f"{node_cmd} {svelte_ls_path}"
+            # Properly quote paths on Windows to handle spaces
+            if platform.system() == "Windows":
+                cmd = f'"{node_cmd}" "{svelte_ls_path}"'
+            else:
+                cmd = f"{node_cmd} {svelte_ls_path}"
         else:
-            cmd = svelte_ls_path
+            # Quote the path on Windows if it contains spaces
+            if platform.system() == "Windows" and " " in svelte_ls_path:
+                cmd = f'"{svelte_ls_path}"'
+            else:
+                cmd = svelte_ls_path
 
         # Add --stdio flag for svelte-language-server
         cmd = f"{cmd} --stdio"
