@@ -1,7 +1,6 @@
 """Test automatic workspace file opening for ZLS."""
 
 import os
-import platform
 
 import pytest
 
@@ -52,9 +51,6 @@ class TestZLSAutoOpen:
         print(f"References in main.zig: {len(main_refs)}")
 
         # With auto-open enabled, we should find cross-file references
-        # On Windows, ZLS auto-open might be less reliable, so we skip this test
-        if platform.system() == "Windows" and len(main_refs) == 0:
-            pytest.skip("ZLS auto-open cross-file references may not work reliably on Windows")
         assert len(main_refs) > 0, "Auto-open should enable finding Calculator references in main.zig"
         print("✅ Auto-open successfully enabled cross-file references!")
 

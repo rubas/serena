@@ -268,12 +268,14 @@ class ZigLanguageServer(SolidLanguageServer):
             for file_path in zig_files:
                 try:
                     full_path = os.path.join(self.repository_root_path, file_path)
+                    # Normalize path for consistent handling
+                    full_path = os.path.normpath(full_path)
 
                     # Read file content
                     with open(full_path, encoding="utf-8") as f:
                         content = f.read()
 
-                    # Create URI for the file
+                    # Create URI for the file - ensure proper URI format on all platforms
                     file_uri = pathlib.Path(full_path).as_uri()
 
                     # Track this file as opened
@@ -289,9 +291,12 @@ class ZigLanguageServer(SolidLanguageServer):
 
             # Give ZLS time to process the opened files
             if zig_files:
+                import platform
                 import time
 
-                time.sleep(0.5)  # Brief pause to let ZLS index the files
+                # Windows needs more time for ZLS to process opened files
+                wait_time = 2.0 if platform.system() == "Windows" else 0.5
+                time.sleep(wait_time)  # Let ZLS index the files
                 self.logger.log(f"Successfully opened {len(self._workspace_files)} workspace files", logging.INFO)
 
         except Exception as e:
