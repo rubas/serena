@@ -112,6 +112,7 @@ With Serena, we provide
   * Bash
   * C/C++ (You may experience issues with finding references, we are working on it)
   * Zig (requires installation of ZLS - Zig Language Server)
+  * Svelte (requires Node.js 12+, automatically installs svelte-language-server via npm)
 * indirect support (may require some code changes/manual installation) for:
   * Kotlin (untested)
   * Dart (untested)

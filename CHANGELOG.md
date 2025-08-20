@@ -3,6 +3,7 @@ Status of the `main` branch. Changes prior to the next official version change w
 
 * Language servers:
   * **Add support for Zig** via ZLS (Zig Language Server)
+  * **Add support for Svelte** via svelte-language-server (automatically installed via npm if not present)
 
 # 0.1.4
 
