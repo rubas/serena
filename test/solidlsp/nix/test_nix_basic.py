@@ -12,10 +12,7 @@ from solidlsp.ls_config import Language, LanguageServerConfig
 from solidlsp.ls_logger import LanguageServerLogger
 
 # Skip all Nix tests on Windows as Nix doesn't support Windows
-pytestmark = pytest.mark.skipif(
-    platform.system() == "Windows",
-    reason="Nix and nil are not available on Windows"
-)
+pytestmark = pytest.mark.skipif(platform.system() == "Windows", reason="Nix and nil are not available on Windows")
 
 
 @pytest.fixture(scope="module")
