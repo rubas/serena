@@ -1,7 +1,9 @@
 """Test automatic workspace file opening for ZLS."""
 
 import os
+
 import pytest
+
 from solidlsp import SolidLanguageServer
 from solidlsp.ls_config import Language
 
@@ -43,7 +45,7 @@ class TestZLSAutoOpen:
         main_refs = [ref for ref in refs if "main.zig" in ref.get("uri", "")]
         calc_refs = [ref for ref in refs if "calculator.zig" in ref.get("uri", "")]
 
-        print(f"\n=== Auto-Open Test Results ===")
+        print("\n=== Auto-Open Test Results ===")
         print(f"Total references found: {len(refs)}")
         print(f"References in calculator.zig: {len(calc_refs)}")
         print(f"References in main.zig: {len(main_refs)}")
@@ -80,7 +82,7 @@ class TestZLSAutoOpen:
         # Check for references in main.zig
         main_refs = [ref for ref in refs if "main.zig" in ref.get("uri", "")]
 
-        print(f"\n=== Math Utils References ===")
+        print("\n=== Math Utils References ===")
         print(f"Total references to factorial: {len(refs)}")
         print(f"References in main.zig: {len(main_refs)}")
 
