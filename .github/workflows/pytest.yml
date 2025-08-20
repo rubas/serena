@@ -181,6 +181,12 @@ jobs:
             echo "$LUA_LS_DIR/bin" >> $GITHUB_PATH
             rm lua-ls.zip
           fi
+      - name: Install nil (Nix Language Server)
+        shell: bash
+        run: |
+          # Install using cargo (Rust is available on GitHub Actions by default)
+          cargo install --git https://github.com/oxalica/nil nil
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - name: Install uv
         shell: bash
         run: curl -LsSf https://astral.sh/uv/install.sh | sh

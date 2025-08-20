@@ -114,6 +114,7 @@ With Serena, we provide
   * Zig (requires installation of ZLS - Zig Language Server)
   * Svelte (requires Node.js 12+, automatically installs svelte-language-server via npm)
   * Lua (automatically downloads lua-language-server if not installed)
+  * Nix (requires nil installation or cargo to build from source)
 * indirect support (may require some code changes/manual installation) for:
   * Kotlin (untested)
   * Dart (untested)
