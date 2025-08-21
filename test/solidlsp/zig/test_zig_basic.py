@@ -323,7 +323,6 @@ class TestZigFileWatcher:
     @pytest.mark.parametrize("language_server", [Language.ZIG], indirect=True)
     def test_file_watcher_new_file_detection(self, language_server: SolidLanguageServer) -> None:
         """Test that new Zig files are automatically opened by the file watcher."""
-        import tempfile
         import time
         from pathlib import Path
 
