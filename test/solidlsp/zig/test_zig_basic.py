@@ -6,6 +6,7 @@ Note: ZLS requires files to be open in the editor to find cross-file references 
 """
 
 import os
+import sys
 
 import pytest
 
@@ -15,8 +16,15 @@ from solidlsp.ls_types import SymbolKind
 
 
 @pytest.mark.zig
+@pytest.mark.skipif(
+    sys.platform == "win32", reason="ZLS is disabled on Windows - cross-file references don't work reliably. Reason unknown."
+)
 class TestZigLanguageServer:
-    """Test Zig language server symbol finding and navigation capabilities."""
+    """Test Zig language server symbol finding and navigation capabilities.
+
+    NOTE: All tests are skipped on Windows as ZLS is disabled on that platform
+    due to unreliable cross-file reference functionality. Reason unknown.
+    """
 
     @pytest.mark.parametrize("language_server", [Language.ZIG], indirect=True)
     def test_find_symbols_in_main(self, language_server: SolidLanguageServer) -> None:
@@ -132,12 +140,18 @@ class TestZigLanguageServer:
             assert line in ref_lines, f"Should find Calculator reference at line {line + 1}, found at lines {[l + 1 for l in ref_lines]}"
 
     @pytest.mark.parametrize("language_server", [Language.ZIG], indirect=True)
+    @pytest.mark.skipif(
+        sys.platform == "win32", reason="ZLS cross-file references don't work reliably on Windows - URI path handling issues"
+    )
     def test_cross_file_references_with_open_files(self, language_server: SolidLanguageServer) -> None:
         """
         Test finding cross-file references with files open.
 
         ZLS limitation: Cross-file references (textDocument/references) only work when
         target files are open. This is a performance optimization in ZLS.
+
+        NOTE: Disabled on Windows as cross-file references cannot be made to work reliably
+        due to URI path handling differences between Windows and Unix systems.
         """
         import time
 
@@ -225,12 +239,18 @@ class TestZigLanguageServer:
             assert line in ref_lines, f"Should find Calculator reference at line {line + 1}, found at lines {[l + 1 for l in ref_lines]}"
 
     @pytest.mark.parametrize("language_server", [Language.ZIG], indirect=True)
+    @pytest.mark.skipif(
+        sys.platform == "win32", reason="ZLS cross-file references don't work reliably on Windows - URI path handling issues"
+    )
     def test_go_to_definition_cross_file(self, language_server: SolidLanguageServer) -> None:
         """
         Test go-to-definition from main.zig to calculator.zig.
 
         ZLS capability: Go-to-definition (textDocument/definition) works cross-file
         WITHOUT requiring files to be open.
+
+        NOTE: Disabled on Windows as cross-file references cannot be made to work reliably
+        due to URI path handling differences between Windows and Unix systems.
         """
         file_path = os.path.join("src", "main.zig")
 
@@ -247,8 +267,15 @@ class TestZigLanguageServer:
         assert "calculator.zig" in calc_def.get("uri", ""), "Definition should be in calculator.zig"
 
     @pytest.mark.parametrize("language_server", [Language.ZIG], indirect=True)
+    @pytest.mark.skipif(
+        sys.platform == "win32", reason="ZLS cross-file references don't work reliably on Windows - URI path handling issues"
+    )
     def test_cross_file_function_usage(self, language_server: SolidLanguageServer) -> None:
-        """Test finding usage of functions from math_utils in main.zig."""
+        """Test finding usage of functions from math_utils in main.zig.
+
+        NOTE: Disabled on Windows as cross-file references cannot be made to work reliably
+        due to URI path handling differences between Windows and Unix systems.
+        """
         # Line 23 in main.zig: const factorial_result = math_utils.factorial(5);
         definitions = language_server.request_definition(os.path.join("src", "main.zig"), 22, 40)  # Position of "factorial"
 

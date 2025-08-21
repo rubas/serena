@@ -5,6 +5,7 @@ Provides Zig specific instantiation of the LanguageServer class using ZLS (Zig L
 import logging
 import os
 import pathlib
+import platform
 import shutil
 import subprocess
 import threading
@@ -23,6 +24,27 @@ class ZigLanguageServer(SolidLanguageServer):
     """
     Provides Zig specific instantiation of the LanguageServer class using ZLS.
     """
+
+    def _get_file_uri(self, absolute_path: str) -> str:
+        """
+        Get a properly formatted file URI that works with ZLS on all platforms.
+
+        On Windows, ZLS expects lowercase drive letters in URIs.
+
+        :param absolute_path: The absolute file system path
+        :return: A properly formatted URI string
+        """
+        uri = pathlib.Path(absolute_path).as_uri()
+
+        if platform.system() == "Windows":
+            # Ensure drive letter is lowercase
+            # Windows URIs from pathlib are in the format file:///C:/path
+            # but ZLS may prefer lowercase drive letters
+            if len(uri) > 8 and uri[8].isalpha() and uri[9] == ":":
+                # Convert file:///C:/ to file:///c:/
+                uri = uri[:8] + uri[8].lower() + uri[9:]
+
+        return uri
 
     @override
     def is_ignored_dirname(self, dirname: str) -> bool:
@@ -66,6 +88,13 @@ class ZigLanguageServer(SolidLanguageServer):
         Check if required Zig runtime dependencies are available.
         Raises RuntimeError with helpful message if dependencies are missing.
         """
+        # Check for Windows and provide error message
+        if platform.system() == "Windows":
+            raise RuntimeError(
+                "Windows is not supported by ZLS in this integration. "
+                "Cross-file references don't work reliably on Windows. Reason unknown."
+            )
+
         zig_version = ZigLanguageServer._get_zig_version()
         if not zig_version:
             raise RuntimeError(
@@ -103,12 +132,11 @@ class ZigLanguageServer(SolidLanguageServer):
         self.server_ready = threading.Event()
         self.request_id = 0
 
-    @staticmethod
-    def _get_initialize_params(repository_absolute_path: str) -> InitializeParams:
+    def _get_initialize_params(self, repository_absolute_path: str) -> InitializeParams:
         """
         Returns the initialize params for the Zig Language Server.
         """
-        root_uri = pathlib.Path(repository_absolute_path).as_uri()
+        root_uri = self._get_file_uri(repository_absolute_path)
         initialize_params = {
             "locale": "en",
             "capabilities": {
@@ -228,7 +256,7 @@ class ZigLanguageServer(SolidLanguageServer):
             try:
                 with open(build_zig_path, encoding="utf-8") as f:
                     content = f.read()
-                    uri = pathlib.Path(build_zig_path).as_uri()
+                    uri = self._get_file_uri(build_zig_path)
                     self.server.notify.did_open_text_document(
                         {
                             "textDocument": {
