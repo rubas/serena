@@ -404,7 +404,9 @@ class ZigLanguageServer(SolidLanguageServer):
                     self._workspace_files.append({"uri": file_uri, "path": file_path})
 
                     # Send didOpen notification to ZLS
-                    self.server.notify.did_open_text_document({"textDocument": {"uri": file_uri, "languageId": "zig", "version": 0, "text": content}})
+                    self.server.notify.did_open_text_document(
+                        {"textDocument": {"uri": file_uri, "languageId": "zig", "version": 0, "text": content}}
+                    )
 
                     self.logger.log(f"Opened {file_path}", logging.DEBUG)
 
