@@ -86,7 +86,7 @@ class ZigFileWatcher(FileSystemEventHandler):
             file_uri = Path(event.src_path).as_uri()
 
             # Send didOpen notification to ZLS
-            self.language_server.server.notify.did_open(
+            self.language_server.server.notify.did_open_text_document(
                 {"textDocument": {"uri": file_uri, "languageId": "zig", "version": 0, "text": content}}
             )
 
@@ -112,7 +112,7 @@ class ZigFileWatcher(FileSystemEventHandler):
             file_uri = Path(event.src_path).as_uri()
 
             # Send didClose notification to ZLS
-            self.language_server.server.notify.did_close({"textDocument": {"uri": file_uri}})
+            self.language_server.server.notify.did_close_text_document({"textDocument": {"uri": file_uri}})
 
             # Remove from tracked files
             self.language_server._workspace_files = [f for f in self.language_server._workspace_files if f["uri"] != file_uri]
@@ -404,7 +404,7 @@ class ZigLanguageServer(SolidLanguageServer):
                     self._workspace_files.append({"uri": file_uri, "path": file_path})
 
                     # Send didOpen notification to ZLS
-                    self.server.notify.did_open({"textDocument": {"uri": file_uri, "languageId": "zig", "version": 0, "text": content}})
+                    self.server.notify.did_open_text_document({"textDocument": {"uri": file_uri, "languageId": "zig", "version": 0, "text": content}})
 
                     self.logger.log(f"Opened {file_path}", logging.DEBUG)
 
@@ -481,6 +481,6 @@ class ZigLanguageServer(SolidLanguageServer):
         if hasattr(self, "_workspace_files") and self._workspace_files:
             try:
                 for file_info in self._workspace_files:
-                    self.server.notify.did_close({"textDocument": {"uri": file_info["uri"]}})
+                    self.server.notify.did_close_text_document({"textDocument": {"uri": file_info["uri"]}})
             except:
                 pass  # Ignore errors during cleanup
