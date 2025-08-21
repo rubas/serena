@@ -11,6 +11,9 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
         
+        # Import our default.nix for shared logic
+        defaultNix = import ./default.nix { inherit pkgs; };
+        
         # Custom derivation for testing
         hello-custom = pkgs.stdenv.mkDerivation {
           pname = "hello-custom";

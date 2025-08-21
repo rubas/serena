@@ -1,5 +1,5 @@
 """
-Provides Nix specific instantiation of the LanguageServer class using nil (NIx Language server).
+Provides Nix specific instantiation of the LanguageServer class using nixd (Nix Language Server).
 
 Note: Windows is not supported as Nix itself doesn't support Windows natively.
 """
@@ -25,7 +25,7 @@ from solidlsp.settings import SolidLSPSettings
 
 class NixLanguageServer(SolidLanguageServer):
     """
-    Provides Nix specific instantiation of the LanguageServer class using nil.
+    Provides Nix specific instantiation of the LanguageServer class using nixd.
     """
 
     @override
@@ -37,47 +37,48 @@ class NixLanguageServer(SolidLanguageServer):
         return super().is_ignored_dirname(dirname) or dirname in ["result", ".direnv"] or dirname.startswith("result-")
 
     @staticmethod
-    def _get_nil_version():
-        """Get the installed nil version or None if not found."""
+    def _get_nixd_version():
+        """Get the installed nixd version or None if not found."""
         try:
-            result = subprocess.run(["nil", "--version"], capture_output=True, text=True, check=False)
+            result = subprocess.run(["nixd", "--version"], capture_output=True, text=True, check=False)
             if result.returncode == 0:
-                # nil outputs version like: nil 2023-08-09
+                # nixd outputs version like: nixd 2.0.0
                 return result.stdout.strip()
         except FileNotFoundError:
             return None
         return None
 
     @staticmethod
-    def _check_nil_installed():
-        """Check if nil is installed in the system."""
-        return shutil.which("nil") is not None
+    def _check_nixd_installed():
+        """Check if nixd is installed in the system."""
+        return shutil.which("nixd") is not None
 
     @staticmethod
-    def _get_nil_path():
-        """Get the path to nil executable."""
+    def _get_nixd_path():
+        """Get the path to nixd executable."""
         # First check if it's in PATH
-        nil_path = shutil.which("nil")
-        if nil_path:
-            return nil_path
+        nixd_path = shutil.which("nixd")
+        if nixd_path:
+            return nixd_path
 
         # Check common installation locations
         home = Path.home()
         possible_paths = [
-            home / ".local" / "bin" / "nil",
-            home / ".serena" / "language_servers" / "nil" / "nil",
-            home / ".cargo" / "bin" / "nil",
-            home / ".nix-profile" / "bin" / "nil",
-            Path("/usr/local/bin/nil"),
-            Path("/run/current-system/sw/bin/nil"),  # NixOS system profile
+            home / ".local" / "bin" / "nixd",
+            home / ".serena" / "language_servers" / "nixd" / "nixd",
+            home / ".nix-profile" / "bin" / "nixd",
+            Path("/usr/local/bin/nixd"),
+            Path("/run/current-system/sw/bin/nixd"),  # NixOS system profile
+            Path("/opt/homebrew/bin/nixd"),  # Homebrew on Apple Silicon
+            Path("/usr/local/opt/nixd/bin/nixd"),  # Homebrew on Intel Mac
         ]
 
         # Add Windows-specific paths
         if platform.system() == "Windows":
             possible_paths.extend(
                 [
-                    home / "AppData" / "Local" / "nil" / "nil.exe",
-                    home / ".serena" / "language_servers" / "nil" / "nil.exe",
+                    home / "AppData" / "Local" / "nixd" / "nixd.exe",
+                    home / ".serena" / "language_servers" / "nixd" / "nixd.exe",
                 ]
             )
 
@@ -88,17 +89,17 @@ class NixLanguageServer(SolidLanguageServer):
         return None
 
     @staticmethod
-    def _install_nil_with_cargo():
-        """Install nil using cargo if available."""
-        # Check if cargo is available
-        if not shutil.which("cargo"):
+    def _install_nixd_with_nix():
+        """Install nixd using nix if available."""
+        # Check if nix is available
+        if not shutil.which("nix"):
             return None
 
-        print("Installing nil using cargo... This may take a few minutes.")
+        print("Installing nixd using nix... This may take a few minutes.")
         try:
-            # Install nil to user's cargo bin directory
+            # Try to install nixd using nix profile
             result = subprocess.run(
-                ["cargo", "install", "--git", "https://github.com/oxalica/nil", "nil"],
+                ["nix", "profile", "install", "github:nix-community/nixd"],
                 capture_output=True,
                 text=True,
                 check=False,
@@ -106,25 +107,31 @@ class NixLanguageServer(SolidLanguageServer):
             )
 
             if result.returncode == 0:
-                # Check if nil is now in PATH
-                nil_path = shutil.which("nil")
-                if nil_path:
-                    print(f"Successfully installed nil at: {nil_path}")
-                    return nil_path
-
-                # Check cargo bin directory
-                home = Path.home()
-                cargo_nil = home / ".cargo" / "bin" / "nil"
-                if cargo_nil.exists():
-                    print(f"Successfully installed nil at: {cargo_nil}")
-                    return str(cargo_nil)
+                # Check if nixd is now in PATH
+                nixd_path = shutil.which("nixd")
+                if nixd_path:
+                    print(f"Successfully installed nixd at: {nixd_path}")
+                    return nixd_path
             else:
-                print(f"Failed to install nil with cargo: {result.stderr}")
+                # Try nix-env as fallback
+                result = subprocess.run(
+                    ["nix-env", "-iA", "nixpkgs.nixd"],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    timeout=600,
+                )
+                if result.returncode == 0:
+                    nixd_path = shutil.which("nixd")
+                    if nixd_path:
+                        print(f"Successfully installed nixd at: {nixd_path}")
+                        return nixd_path
+                print(f"Failed to install nixd: {result.stderr}")
 
         except subprocess.TimeoutExpired:
-            print("Cargo install timed out after 10 minutes")
+            print("Nix install timed out after 10 minutes")
         except Exception as e:
-            print(f"Error installing nil with cargo: {e}")
+            print(f"Error installing nixd with nix: {e}")
 
         return None
 
@@ -132,52 +139,51 @@ class NixLanguageServer(SolidLanguageServer):
     def _setup_runtime_dependency():
         """
         Check if required Nix runtime dependencies are available.
-        Attempts to install nil if not present.
+        Attempts to install nixd if not present.
         """
-        # First check if Nix is available (nil might need it at runtime)
+        # First check if Nix is available (nixd needs it at runtime)
         if not shutil.which("nix"):
-            print("WARNING: Nix is not installed. nil may have limited functionality.")
-            print("Some operations like 'nix flake check' may not work.")
+            print("WARNING: Nix is not installed. nixd requires Nix to function properly.")
+            raise RuntimeError("Nix is required for nixd. Please install Nix from https://nixos.org/download.html")
 
-        nil_path = NixLanguageServer._get_nil_path()
+        nixd_path = NixLanguageServer._get_nixd_path()
 
-        if not nil_path:
-            print("nil not found. Attempting to install...")
+        if not nixd_path:
+            print("nixd not found. Attempting to install...")
 
-            # Try to install with cargo if available
-            nil_path = NixLanguageServer._install_nil_with_cargo()
+            # Try to install with nix if available
+            nixd_path = NixLanguageServer._install_nixd_with_nix()
 
-            if not nil_path:
+            if not nixd_path:
                 raise RuntimeError(
-                    "nil (Nix Language Server) is not installed.\n"
-                    "Please install nil using one of the following methods:\n"
-                    "  - Using Nix: nix profile install github:oxalica/nil\n"
-                    "  - Using cargo: cargo install --git https://github.com/oxalica/nil nil\n"
-                    "  - On macOS with Homebrew: brew install nil\n"
-                    "  - From nixpkgs: nix-env -iA nixpkgs.nil\n\n"
-                    "After installation, make sure 'nil' is in your PATH."
+                    "nixd (Nix Language Server) is not installed.\n"
+                    "Please install nixd using one of the following methods:\n"
+                    "  - Using Nix flakes: nix profile install github:nix-community/nixd\n"
+                    "  - From nixpkgs: nix-env -iA nixpkgs.nixd\n"
+                    "  - On macOS with Homebrew: brew install nixd\n\n"
+                    "After installation, make sure 'nixd' is in your PATH."
                 )
 
-        # Verify nil works
+        # Verify nixd works
         try:
-            result = subprocess.run([nil_path, "--version"], capture_output=True, text=True, check=False, timeout=5)
+            result = subprocess.run([nixd_path, "--version"], capture_output=True, text=True, check=False, timeout=5)
             if result.returncode != 0:
-                raise RuntimeError(f"nil failed to run: {result.stderr}")
+                raise RuntimeError(f"nixd failed to run: {result.stderr}")
         except Exception as e:
-            raise RuntimeError(f"Failed to verify nil installation: {e}")
+            raise RuntimeError(f"Failed to verify nixd installation: {e}")
 
-        return nil_path
+        return nixd_path
 
     def __init__(
         self, config: LanguageServerConfig, logger: LanguageServerLogger, repository_root_path: str, solidlsp_settings: SolidLSPSettings
     ):
-        nil_path = self._setup_runtime_dependency()
+        nixd_path = self._setup_runtime_dependency()
 
         super().__init__(
             config,
             logger,
             repository_root_path,
-            ProcessLaunchInfo(cmd=nil_path, cwd=repository_root_path),
+            ProcessLaunchInfo(cmd=nixd_path, cwd=repository_root_path),
             "nix",
             solidlsp_settings,
         )
@@ -187,7 +193,7 @@ class NixLanguageServer(SolidLanguageServer):
     @staticmethod
     def _get_initialize_params(repository_absolute_path: str) -> InitializeParams:
         """
-        Returns the initialize params for nil.
+        Returns the initialize params for nixd.
         """
         root_uri = pathlib.Path(repository_absolute_path).as_uri()
         initialize_params = {
@@ -262,15 +268,21 @@ class NixLanguageServer(SolidLanguageServer):
                 }
             ],
             "initializationOptions": {
-                # nil specific options
-                "autoArchive": False,  # Don't automatically eval and build all packages
-                "autoEvalInputs": True,  # Automatically eval flake inputs for better completion
+                # nixd specific options
+                "nixpkgs": {"expr": "import <nixpkgs> { }"},
+                "formatting": {"command": ["nixpkgs-fmt"]},  # or ["alejandra"] or ["nixfmt"]
+                "options": {
+                    "enable": True,
+                    "target": {
+                        "installable": "",  # Will be auto-detected from flake.nix if present
+                    },
+                },
             },
         }
         return initialize_params
 
     def _start_server(self):
-        """Start nil server process"""
+        """Start nixd server process"""
 
         def register_capability_handler(params):
             return
@@ -286,7 +298,7 @@ class NixLanguageServer(SolidLanguageServer):
         self.server.on_notification("$/progress", do_nothing)
         self.server.on_notification("textDocument/publishDiagnostics", do_nothing)
 
-        self.logger.log("Starting nil server process", logging.INFO)
+        self.logger.log("Starting nixd server process", logging.INFO)
         self.server.start()
         initialize_params = self._get_initialize_params(self.repository_root_path)
 
@@ -305,6 +317,6 @@ class NixLanguageServer(SolidLanguageServer):
         self.server.notify.initialized({})
         self.completions_available.set()
 
-        # nil server is typically ready immediately after initialization
+        # nixd server is typically ready immediately after initialization
         self.server_ready.set()
         self.server_ready.wait()

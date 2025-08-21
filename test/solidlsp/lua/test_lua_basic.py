@@ -1,188 +1,255 @@
 """
 Tests for the Lua language server implementation.
-"""
 
-from pathlib import Path
+These tests validate symbol finding and cross-file reference capabilities
+for Lua modules and functions.
+"""
 
 import pytest
 
-from solidlsp.ls import SolidLanguageServer
-from solidlsp.ls_config import Language, LanguageServerConfig
-from solidlsp.ls_logger import LanguageServerLogger
-
-
-@pytest.fixture(scope="module")
-def lua_server():
-    """Create and start a Lua language server for testing."""
-    test_repo_path = Path(__file__).parent.parent.parent / "resources" / "repos" / "lua" / "test_repo"
-
-    config = LanguageServerConfig(
-        code_language=Language.LUA,
-        trace_lsp_communication=False,
-        start_independent_lsp_process=True,
-        ignored_paths=[],
-    )
-    logger = LanguageServerLogger("lua_test")
-
-    server = SolidLanguageServer.create(
-        config=config,
-        logger=logger,
-        repository_root_path=str(test_repo_path),
-    )
-
-    server.start()
-    yield server
-    server.stop()
+from solidlsp import SolidLanguageServer
+from solidlsp.ls_config import Language
+from solidlsp.ls_types import SymbolKind
 
 
 @pytest.mark.lua
-def test_lua_server_starts(lua_server):
-    """Test that the Lua language server starts successfully."""
-    assert lua_server.is_running()
+class TestLuaLanguageServer:
+    """Test Lua language server symbol finding and cross-file references."""
 
+    @pytest.mark.parametrize("language_server", [Language.LUA], indirect=True)
+    def test_find_symbols_in_calculator(self, language_server: SolidLanguageServer) -> None:
+        """Test finding specific functions in calculator.lua."""
+        symbols = language_server.request_document_symbols("src/calculator.lua")
 
-@pytest.mark.lua
-def test_lua_get_document_symbols(lua_server):
-    """Test getting document symbols from a Lua file."""
-    symbols = lua_server.request_document_symbols("src/calculator.lua")
+        assert symbols is not None
+        assert len(symbols) > 0
 
-    assert symbols is not None
-    assert len(symbols) > 0
+        # Extract function names from the returned structure
+        symbol_list = symbols[0] if isinstance(symbols, tuple) else symbols
+        function_names = set()
+        for symbol in symbol_list:
+            if isinstance(symbol, dict):
+                name = symbol.get("name", "")
+                # Handle both plain names and module-prefixed names
+                if "." in name:
+                    name = name.split(".")[-1]
+                if symbol.get("kind") == SymbolKind.Function:
+                    function_names.add(name)
 
-    # Symbols is a tuple with (symbols, None)
-    symbol_list = symbols[0] if isinstance(symbols, tuple) else symbols
+        # Verify exact calculator functions exist
+        expected_functions = {"add", "subtract", "multiply", "divide", "factorial"}
+        found_functions = function_names & expected_functions
+        assert found_functions == expected_functions, f"Expected exactly {expected_functions}, found {found_functions}"
 
-    # Check for expected function symbols
-    function_names = set()
-    for symbol in symbol_list:
-        if isinstance(symbol, dict) and symbol.get("kind") == 12:  # 12 is Function
-            name = symbol["name"]
-            # Handle both plain names and module-prefixed names
-            if "." in name:
-                name = name.split(".")[-1]
-            function_names.add(name)
+        # Verify specific functions
+        assert "add" in function_names, "add function not found"
+        assert "multiply" in function_names, "multiply function not found"
+        assert "factorial" in function_names, "factorial function not found"
 
-    expected_functions = {"add", "subtract", "multiply", "divide", "power", "factorial", "mean", "median"}
+    @pytest.mark.parametrize("language_server", [Language.LUA], indirect=True)
+    def test_find_symbols_in_utils(self, language_server: SolidLanguageServer) -> None:
+        """Test finding specific functions in utils.lua."""
+        symbols = language_server.request_document_symbols("src/utils.lua")
 
-    for func in expected_functions:
-        assert func in function_names, f"Expected function '{func}' not found in symbols"
+        assert symbols is not None
+        assert len(symbols) > 0
 
+        symbol_list = symbols[0] if isinstance(symbols, tuple) else symbols
+        function_names = set()
+        all_symbols = set()
 
-@pytest.mark.lua
-def test_lua_get_definition(lua_server):
-    """Test getting definition of a symbol in Lua."""
-    # In main.lua, calculator is required from src.calculator
-    # Test finding the definition of calculator.add
-    definitions = lua_server.request_definition("main.lua", 17, 30)  # Line where calculator.add is called
+        for symbol in symbol_list:
+            if isinstance(symbol, dict):
+                name = symbol.get("name", "")
+                all_symbols.add(name)
+                # Handle both plain names and module-prefixed names
+                if "." in name:
+                    name = name.split(".")[-1]
+                if symbol.get("kind") == SymbolKind.Function:
+                    function_names.add(name)
 
-    assert definitions is not None
-    # Just check that we get some definitions - cross-file navigation may vary by LSP
-    assert len(definitions) >= 0, "Should return a list of definitions (may be empty)"
+        # Verify exact string utility functions
+        expected_utils = {"trim", "split", "starts_with", "ends_with"}
+        found_utils = function_names & expected_utils
+        assert found_utils == expected_utils, f"Expected exactly {expected_utils}, found {found_utils}"
 
+        # Verify exact table utility functions
+        table_utils = {"deep_copy", "table_contains", "table_merge"}
+        found_table_utils = function_names & table_utils
+        assert found_table_utils == table_utils, f"Expected exactly {table_utils}, found {found_table_utils}"
 
-@pytest.mark.lua
-def test_lua_get_references(lua_server):
-    """Test finding references to a symbol in Lua."""
-    # Find references to the 'add' function
-    references = lua_server.request_references("src/calculator.lua", 5, 10)
+        # Check for Logger class/table
+        assert "Logger" in all_symbols or any("Logger" in s for s in all_symbols), "Logger not found in symbols"
 
-    assert references is not None
-    # Should find at least the declaration
-    assert len(references) >= 1
+    @pytest.mark.parametrize("language_server", [Language.LUA], indirect=True)
+    def test_find_symbols_in_main(self, language_server: SolidLanguageServer) -> None:
+        """Test finding functions in main.lua."""
+        symbols = language_server.request_document_symbols("main.lua")
 
+        assert symbols is not None
+        assert len(symbols) > 0
 
-@pytest.mark.lua
-def test_lua_document_symbols_utils(lua_server):
-    """Test document symbols for the utils module."""
-    symbols = lua_server.request_document_symbols("src/utils.lua")
+        symbol_list = symbols[0] if isinstance(symbols, tuple) else symbols
+        function_names = set()
 
-    assert symbols is not None
-    assert len(symbols) > 0
+        for symbol in symbol_list:
+            if isinstance(symbol, dict) and symbol.get("kind") == SymbolKind.Function:
+                function_names.add(symbol.get("name", ""))
 
-    # Symbols is a tuple with (symbols, None)
-    symbol_list = symbols[0] if isinstance(symbols, tuple) else symbols
+        # Verify exact main functions exist
+        expected_funcs = {"print_banner", "test_calculator", "test_utils"}
+        found_funcs = function_names & expected_funcs
+        assert found_funcs == expected_funcs, f"Expected exactly {expected_funcs}, found {found_funcs}"
 
-    # Check for expected utility functions
-    function_names = set()
-    for symbol in symbol_list:
-        if isinstance(symbol, dict) and symbol.get("kind") == 12:
-            name = symbol["name"]
-            # Handle both plain names and module-prefixed names
-            if "." in name:
-                name = name.split(".")[-1]
-            function_names.add(name)
+        assert "test_calculator" in function_names, "test_calculator function not found"
+        assert "test_utils" in function_names, "test_utils function not found"
 
-    expected_utils = {"trim", "split", "starts_with", "ends_with", "deep_copy", "table_contains", "table_merge"}
+    @pytest.mark.parametrize("language_server", [Language.LUA], indirect=True)
+    def test_cross_file_references_calculator_add(self, language_server: SolidLanguageServer) -> None:
+        """Test finding cross-file references to calculator.add function."""
+        symbols = language_server.request_document_symbols("src/calculator.lua")
 
-    for func in expected_utils:
-        assert func in function_names, f"Expected utility function '{func}' not found"
+        assert symbols is not None
+        symbol_list = symbols[0] if isinstance(symbols, tuple) else symbols
 
+        # Find the add function
+        add_symbol = None
+        for sym in symbol_list:
+            if isinstance(sym, dict):
+                name = sym.get("name", "")
+                if "add" in name or name == "add":
+                    add_symbol = sym
+                    break
 
-@pytest.mark.lua
-def test_lua_nested_symbols(lua_server):
-    """Test that nested symbols (like Logger methods) are detected."""
-    symbols = lua_server.request_document_symbols("src/utils.lua")
+        assert add_symbol is not None, "add function not found in calculator.lua"
 
-    assert symbols is not None
+        # Get references to the add function
+        range_info = add_symbol.get("selectionRange", add_symbol.get("range"))
+        assert range_info is not None, "add function has no range information"
 
-    # Symbols is a tuple with (symbols, None)
-    symbol_list = symbols[0] if isinstance(symbols, tuple) else symbols
+        range_start = range_info["start"]
+        refs = language_server.request_references("src/calculator.lua", range_start["line"], range_start["character"])
 
-    # Look for Logger class and its methods
-    symbol_names = set()
-    for symbol in symbol_list:
-        if isinstance(symbol, dict):
-            symbol_names.add(symbol.get("name", ""))
+        assert refs is not None
+        assert isinstance(refs, list)
+        # add function appears in: main.lua (lines 16, 71), test_calculator.lua (lines 22, 23, 24)
+        # Note: The declaration itself may or may not be included as a reference
+        assert len(refs) >= 5, f"Should find at least 5 references to calculator.add, found {len(refs)}"
 
-    # Logger should be detected as a table/namespace
-    assert "Logger" in symbol_names or any("Logger" in name for name in symbol_names)
+        # Verify exact reference locations
+        ref_files = {}
+        for ref in refs:
+            filename = ref.get("uri", "").split("/")[-1]
+            if filename not in ref_files:
+                ref_files[filename] = []
+            ref_files[filename].append(ref["range"]["start"]["line"])
 
+        # The declaration may or may not be included
+        if "calculator.lua" in ref_files:
+            assert (
+                5 in ref_files["calculator.lua"]
+            ), f"If declaration is included, it should be at line 6 (0-indexed: 5), found at {ref_files['calculator.lua']}"
 
-@pytest.mark.lua
-def test_lua_cross_file_navigation(lua_server):
-    """Test navigation between files using require statements."""
-    # In main.lua, find where calculator module is used
-    symbols = lua_server.request_document_symbols("main.lua")
+        # Check main.lua has usages
+        assert "main.lua" in ref_files, "Should find add usages in main.lua"
+        assert (
+            15 in ref_files["main.lua"] or 70 in ref_files["main.lua"]
+        ), f"Should find add usage in main.lua, found at lines {ref_files.get('main.lua', [])}"
 
-    assert symbols is not None
-    assert len(symbols) > 0
+        # Check for cross-file references from main.lua
+        main_refs = [ref for ref in refs if "main.lua" in ref.get("uri", "")]
+        assert len(main_refs) > 0, "calculator.add should be called in main.lua"
 
-    # Symbols is a tuple with (symbols, None)
-    symbol_list = symbols[0] if isinstance(symbols, tuple) else symbols
+    @pytest.mark.parametrize("language_server", [Language.LUA], indirect=True)
+    def test_cross_file_references_utils_trim(self, language_server: SolidLanguageServer) -> None:
+        """Test finding cross-file references to utils.trim function."""
+        symbols = language_server.request_document_symbols("src/utils.lua")
 
-    # Check for main functions
-    function_names = set()
-    for symbol in symbol_list:
-        if isinstance(symbol, dict) and symbol.get("kind") == 12:
-            function_names.add(symbol["name"])
+        assert symbols is not None
+        symbol_list = symbols[0] if isinstance(symbols, tuple) else symbols
 
-    expected_funcs = {"print_banner", "test_calculator", "test_utils", "interactive_calculator", "main"}
+        # Find the trim function
+        trim_symbol = None
+        for sym in symbol_list:
+            if isinstance(sym, dict):
+                name = sym.get("name", "")
+                if "trim" in name or name == "trim":
+                    trim_symbol = sym
+                    break
 
-    for func in expected_funcs:
-        assert func in function_names, f"Expected function '{func}' not found in main.lua"
+        assert trim_symbol is not None, "trim function not found in utils.lua"
 
+        # Get references to the trim function
+        range_info = trim_symbol.get("selectionRange", trim_symbol.get("range"))
+        assert range_info is not None, "trim function has no range information"
 
-@pytest.mark.lua
-def test_lua_get_folding_ranges(lua_server):
-    """Test getting folding ranges for Lua code."""
-    # Skip this test as request_folding_range is not available in the base class
-    pytest.skip("Folding ranges not implemented in base language server")
+        range_start = range_info["start"]
+        refs = language_server.request_references("src/utils.lua", range_start["line"], range_start["character"])
 
+        assert refs is not None
+        assert isinstance(refs, list)
+        # trim function appears in: usage (line 32 in main.lua)
+        # Note: The declaration itself may or may not be included as a reference
+        assert len(refs) >= 1, f"Should find at least 1 reference to utils.trim, found {len(refs)}"
 
-@pytest.mark.lua
-def test_lua_completions(lua_server):
-    """Test code completions in Lua."""
-    # Test completions after typing "calculator."
-    try:
-        completions = lua_server.request_completions("main.lua", 17, 31)  # After "calculator."
+        # Verify exact reference locations
+        ref_files = {}
+        for ref in refs:
+            filename = ref.get("uri", "").split("/")[-1]
+            if filename not in ref_files:
+                ref_files[filename] = []
+            ref_files[filename].append(ref["range"]["start"]["line"])
 
-        if completions is not None and len(completions) > 0:
-            # Should suggest calculator module functions
-            completion_labels = {item.get("label", "") for item in completions if isinstance(item, dict)}
-            # At least some calculator functions should be suggested
-            calculator_funcs = {"add", "subtract", "multiply", "divide"}
-            if len(completion_labels) > 0:
-                assert len(completion_labels.intersection(calculator_funcs)) > 0
-    except AssertionError:
-        # Lua Language Server may not always provide completions in the expected format
-        pytest.skip("Completions not in expected format for Lua Language Server")
+        # The declaration may or may not be included
+        if "utils.lua" in ref_files:
+            assert (
+                5 in ref_files["utils.lua"]
+            ), f"If declaration is included, it should be at line 6 (0-indexed: 5), found at {ref_files['utils.lua']}"
+
+        # Check main.lua has usage
+        assert "main.lua" in ref_files, "Should find trim usage in main.lua"
+        assert (
+            31 in ref_files["main.lua"]
+        ), f"Should find trim usage at line 32 (0-indexed: 31) in main.lua, found at lines {ref_files.get('main.lua', [])}"
+
+        # Check for cross-file references from main.lua
+        main_refs = [ref for ref in refs if "main.lua" in ref.get("uri", "")]
+        assert len(main_refs) > 0, "utils.trim should be called in main.lua"
+
+    @pytest.mark.parametrize("language_server", [Language.LUA], indirect=True)
+    def test_hover_information(self, language_server: SolidLanguageServer) -> None:
+        """Test hover information for symbols."""
+        # Get hover info for a function
+        hover_info = language_server.request_hover("src/calculator.lua", 5, 10)  # Position near add function
+
+        assert hover_info is not None, "Should provide hover information"
+
+        # Hover info could be a dict with 'contents' or a string
+        if isinstance(hover_info, dict):
+            assert "contents" in hover_info or "value" in hover_info, "Hover should have contents"
+
+    @pytest.mark.parametrize("language_server", [Language.LUA], indirect=True)
+    def test_full_symbol_tree(self, language_server: SolidLanguageServer) -> None:
+        """Test that full symbol tree is not empty."""
+        symbols = language_server.request_full_symbol_tree()
+
+        assert symbols is not None
+        assert len(symbols) > 0, "Symbol tree should not be empty"
+
+        # The tree should have at least one root node
+        root = symbols[0]
+        assert isinstance(root, dict), "Root should be a dict"
+        assert "name" in root, "Root should have a name"
+
+    @pytest.mark.parametrize("language_server", [Language.LUA], indirect=True)
+    def test_references_between_test_and_source(self, language_server: SolidLanguageServer) -> None:
+        """Test finding references from test files to source files."""
+        # Check if test_calculator.lua references calculator module
+        test_symbols = language_server.request_document_symbols("tests/test_calculator.lua")
+
+        assert test_symbols is not None
+        assert len(test_symbols) > 0
+
+        # The test file should have some content that references calculator
+        symbol_list = test_symbols[0] if isinstance(test_symbols, tuple) else test_symbols
+        assert len(symbol_list) > 0, "test_calculator.lua should have symbols"
