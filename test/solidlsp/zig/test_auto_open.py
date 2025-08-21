@@ -1,5 +1,3 @@
-"""Test automatic workspace file opening for ZLS."""
-
 import os
 
 import pytest
