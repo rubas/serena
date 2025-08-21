@@ -219,7 +219,7 @@ class ZigLanguageServer(SolidLanguageServer):
         build_zig_path = os.path.join(self.repository_root_path, "build.zig")
         if os.path.exists(build_zig_path):
             try:
-                with open(build_zig_path, "r", encoding="utf-8") as f:
+                with open(build_zig_path, encoding="utf-8") as f:
                     content = f.read()
                     uri = pathlib.Path(build_zig_path).as_uri()
                     self.server.notify.did_open_text_document(
