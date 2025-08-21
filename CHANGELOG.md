@@ -1,10 +1,15 @@
 # latest
 Status of the `main` branch. Changes prior to the next official version change will appear here.
 
+
 * Language servers:
   * **Add support for Zig** via ZLS (Zig Language Server)
   * **Add support for Lua** via lua-language-server (automatically downloaded if not installed)
   * **Add support for Nix** via nixd (Nix Language server) - requires nixd installation (Windows not supported)
+
+## Breaking Changes
+
+* **Rust support now requires rustup**: The rust-analyzer is no longer bundled with Serena. Instead, it uses the rust-analyzer from your Rust toolchain managed by rustup. This ensures compatibility with your Rust version and eliminates outdated bundled binaries. If you don't have rustup installed, you'll need to install it from https://rustup.rs/
 
 # 0.1.4
 
