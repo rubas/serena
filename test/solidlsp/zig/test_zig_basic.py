@@ -174,12 +174,14 @@ class TestZigLanguageServer:
 
                     # With files open, ZLS should find cross-file references
                     main_refs = [ref for ref in refs if "main.zig" in ref.get("uri", "")]
-                    
+
                     assert len(main_refs) >= 1, f"Should find at least 1 Calculator reference in main.zig, found {len(main_refs)}"
-                    
+
                     # Verify exact location in main.zig (line 8, 0-indexed: 7)
                     main_ref_line = main_refs[0]["range"]["start"]["line"]
-                    assert main_ref_line == 7, f"Calculator reference in main.zig should be at line 8 (0-indexed: 7), found at line {main_ref_line + 1}"
+                    assert (
+                        main_ref_line == 7
+                    ), f"Calculator reference in main.zig should be at line 8 (0-indexed: 7), found at line {main_ref_line + 1}"
 
     @pytest.mark.parametrize("language_server", [Language.ZIG], indirect=True)
     def test_cross_file_references_within_file(self, language_server: SolidLanguageServer) -> None:
