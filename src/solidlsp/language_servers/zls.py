@@ -211,6 +211,27 @@ class ZigLanguageServer(SolidLanguageServer):
         self.server.notify.initialized({})
         self.completions_available.set()
 
-        # ZLS server is typically ready immediately after initialization
+        # ZLS server is ready after initialization
         self.server_ready.set()
         self.server_ready.wait()
+
+        # Open build.zig if it exists to help ZLS understand project structure
+        build_zig_path = os.path.join(self.repository_root_path, "build.zig")
+        if os.path.exists(build_zig_path):
+            try:
+                with open(build_zig_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    uri = pathlib.Path(build_zig_path).as_uri()
+                    self.server.notify.did_open_text_document(
+                        {
+                            "textDocument": {
+                                "uri": uri,
+                                "languageId": "zig",
+                                "version": 1,
+                                "text": content,
+                            }
+                        }
+                    )
+                    self.logger.log("Opened build.zig to provide project context to ZLS", logging.INFO)
+            except Exception as e:
+                self.logger.log(f"Failed to open build.zig: {e}", logging.WARNING)
