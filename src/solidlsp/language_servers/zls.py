@@ -9,15 +9,131 @@ import shutil
 import subprocess
 import threading
 from pathlib import Path
+from typing import Optional
 
 from overrides import override
+from watchdog.events import FileSystemEventHandler
+from watchdog.observers import Observer
 
+from serena.util.file_system import GitignoreParser
 from solidlsp.ls import SolidLanguageServer
 from solidlsp.ls_config import LanguageServerConfig
 from solidlsp.ls_logger import LanguageServerLogger
 from solidlsp.lsp_protocol_handler.lsp_types import InitializeParams
 from solidlsp.lsp_protocol_handler.server import ProcessLaunchInfo
 from solidlsp.settings import SolidLSPSettings
+
+
+class ZigFileWatcher(FileSystemEventHandler):
+    """
+    File system event handler for watching Zig files.
+
+    Monitors for new, modified, and deleted .zig files and sends
+    appropriate LSP notifications to keep ZLS in sync.
+    """
+
+    def __init__(self, language_server: "ZigLanguageServer", gitignore_parser: Optional[GitignoreParser] = None):
+        """
+        Initialize the Zig file watcher.
+
+        :param language_server: The ZigLanguageServer instance to notify
+        :param gitignore_parser: Optional GitignoreParser to respect gitignore patterns
+        """
+        self.language_server = language_server
+        self.gitignore_parser = gitignore_parser
+        self.logger = language_server.logger
+
+    def _should_process_file(self, file_path: str) -> bool:
+        """Check if a file should be processed based on extension and gitignore."""
+        # Only process .zig files
+        if not file_path.endswith(".zig"):
+            return False
+
+        # Check gitignore if parser is available
+        if self.gitignore_parser:
+            try:
+                relative_path = Path(file_path).relative_to(self.language_server.repository_root_path)
+                if self.gitignore_parser.is_ignored(str(relative_path)):
+                    self.logger.log(f"Ignoring gitignored file: {relative_path}", logging.DEBUG)
+                    return False
+            except Exception as e:
+                self.logger.log(f"Error checking gitignore for {file_path}: {e}", logging.WARNING)
+
+        # Check if file is in an ignored directory
+        path_parts = Path(file_path).parts
+        for part in path_parts:
+            if self.language_server.is_ignored_dirname(part):
+                return False
+
+        return True
+
+    def on_created(self, event):
+        """Handle file creation events."""
+        if event.is_directory:
+            return
+
+        if not self._should_process_file(event.src_path):
+            return
+
+        self.logger.log(f"New Zig file detected: {event.src_path}", logging.INFO)
+
+        try:
+            # Read the new file content
+            with open(event.src_path, encoding="utf-8") as f:
+                content = f.read()
+
+            # Create URI for the file
+            file_uri = Path(event.src_path).as_uri()
+
+            # Send didOpen notification to ZLS
+            self.language_server.server.notify.did_open_text_document(
+                {"textDocument": {"uri": file_uri, "languageId": "zig", "version": 0, "text": content}}
+            )
+
+            # Track the opened file
+            self.language_server._workspace_files.append({"uri": file_uri, "path": event.src_path})
+
+            self.logger.log(f"Opened new file in ZLS: {event.src_path}", logging.DEBUG)
+
+        except Exception as e:
+            self.logger.log(f"Failed to open new file {event.src_path}: {e}", logging.ERROR)
+
+    def on_deleted(self, event):
+        """Handle file deletion events."""
+        if event.is_directory:
+            return
+
+        if not event.src_path.endswith(".zig"):
+            return
+
+        self.logger.log(f"Zig file deleted: {event.src_path}", logging.INFO)
+
+        try:
+            file_uri = Path(event.src_path).as_uri()
+
+            # Send didClose notification to ZLS
+            self.language_server.server.notify.did_close_text_document({"textDocument": {"uri": file_uri}})
+
+            # Remove from tracked files
+            self.language_server._workspace_files = [f for f in self.language_server._workspace_files if f["uri"] != file_uri]
+
+            self.logger.log(f"Closed deleted file in ZLS: {event.src_path}", logging.DEBUG)
+
+        except Exception as e:
+            self.logger.log(f"Failed to close deleted file {event.src_path}: {e}", logging.ERROR)
+
+    def on_modified(self, event):
+        """Handle file modification events."""
+        if event.is_directory:
+            return
+
+        if not self._should_process_file(event.src_path):
+            return
+
+        # For modifications, ZLS typically handles them through didChange notifications
+        # But since we're not tracking file contents, we'll skip this for now
+        # The IDE/editor should handle modifications through normal LSP flow
+        self.logger.log(f"Zig file modified: {event.src_path} (handled by IDE)", logging.DEBUG)
 
 
 class ZigLanguageServer(SolidLanguageServer):
@@ -107,6 +223,9 @@ class ZigLanguageServer(SolidLanguageServer):
         self._workspace_files = []
         # Configuration for auto-opening workspace files (default: enabled)
         self.auto_open_workspace = True  # Enable by default for better cross-file support
+        # File watcher for monitoring new/deleted Zig files
+        self._file_observer: Optional[Observer] = None
+        self._file_watcher: Optional[ZigFileWatcher] = None
 
     @staticmethod
     def _get_initialize_params(repository_absolute_path: str) -> InitializeParams:
@@ -227,6 +346,9 @@ class ZigLanguageServer(SolidLanguageServer):
         if self.auto_open_workspace:
             self._open_workspace_files()
 
+        # Start file watcher for new/deleted files
+        self._start_file_watcher()
+
         # ZLS server is typically ready immediately after initialization
         self.server_ready.set()
         self.server_ready.wait()
@@ -282,7 +404,9 @@ class ZigLanguageServer(SolidLanguageServer):
                     self._workspace_files.append({"uri": file_uri, "path": file_path})
 
                     # Send didOpen notification to ZLS
-                    self.server.notify.did_open({"textDocument": {"uri": file_uri, "languageId": "zig", "version": 0, "text": content}})
+                    self.server.notify.did_open_text_document(
+                        {"textDocument": {"uri": file_uri, "languageId": "zig", "version": 0, "text": content}}
+                    )
 
                     self.logger.log(f"Opened {file_path}", logging.DEBUG)
 
@@ -302,11 +426,63 @@ class ZigLanguageServer(SolidLanguageServer):
         except Exception as e:
             self.logger.log(f"Error opening workspace files: {e}", logging.WARNING)
 
+    def _start_file_watcher(self):
+        """Start watching for new/deleted Zig files in the workspace."""
+        try:
+            # Initialize gitignore parser if configured
+            gitignore_parser = None
+            try:
+                gitignore_parser = GitignoreParser(self.repository_root_path)
+                self.logger.log(f"Initialized gitignore parser with {len(gitignore_parser.get_ignore_specs())} patterns", logging.DEBUG)
+            except Exception as e:
+                self.logger.log(f"Could not initialize gitignore parser: {e}", logging.WARNING)
+
+            # Create file watcher
+            self._file_watcher = ZigFileWatcher(self, gitignore_parser)
+
+            # Create and start observer
+            self._file_observer = Observer()
+            self._file_observer.schedule(self._file_watcher, self.repository_root_path, recursive=True)
+            self._file_observer.start()
+
+            self.logger.log(f"Started file watcher for Zig files in {self.repository_root_path}", logging.INFO)
+
+        except Exception as e:
+            self.logger.log(f"Failed to start file watcher: {e}", logging.ERROR)
+            self._file_observer = None
+            self._file_watcher = None
+
+    def _stop_file_watcher(self):
+        """Stop the file watcher if it's running."""
+        if self._file_observer and self._file_observer.is_alive():
+            try:
+                self._file_observer.stop()
+                self._file_observer.join(timeout=2.0)
+                self.logger.log("Stopped file watcher", logging.DEBUG)
+            except Exception as e:
+                self.logger.log(f"Error stopping file watcher: {e}", logging.WARNING)
+
+        self._file_observer = None
+        self._file_watcher = None
+
+    @override
+    def stop(self, shutdown_timeout: float = 2.0) -> None:
+        """Stop the language server and clean up resources."""
+        # Stop file watcher first
+        self._stop_file_watcher()
+
+        # Then call parent stop
+        super().stop(shutdown_timeout)
+
     def __del__(self):
-        """Clean up by closing workspace files if they were auto-opened."""
+        """Clean up by closing workspace files and stopping file watcher."""
+        # Stop file watcher
+        self._stop_file_watcher()
+
+        # Close auto-opened files
         if hasattr(self, "_workspace_files") and self._workspace_files:
             try:
                 for file_info in self._workspace_files:
-                    self.server.notify.did_close({"textDocument": {"uri": file_info["uri"]}})
+                    self.server.notify.did_close_text_document({"textDocument": {"uri": file_info["uri"]}})
             except:
                 pass  # Ignore errors during cleanup

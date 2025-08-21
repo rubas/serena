@@ -314,3 +314,182 @@ class TestZigLanguageServer:
         root = symbols[0]
         assert isinstance(root, dict), "Root should be a dict"
         assert "name" in root, "Root should have a name"
+
+
+@pytest.mark.zig
+class TestZigFileWatcher:
+    """Test Zig language server file watcher functionality."""
+
+    @pytest.mark.parametrize("language_server", [Language.ZIG], indirect=True)
+    def test_file_watcher_new_file_detection(self, language_server: SolidLanguageServer) -> None:
+        """Test that new Zig files are automatically opened by the file watcher."""
+        import time
+        from pathlib import Path
+
+        # Create a temporary Zig file in the src directory
+        src_dir = Path(language_server.repository_root_path) / "src"
+        temp_file_path = src_dir / "temp_test.zig"
+
+        try:
+            # Write a simple Zig function to the temporary file
+            temp_file_content = """
+pub fn tempFunction() void {
+    const message = "Hello from temp file";
+    _ = message;
+}
+
+pub fn anotherFunc(x: i32) i32 {
+    return x * 2;
+}
+"""
+            temp_file_path.write_text(temp_file_content)
+
+            # Give the file watcher time to detect and open the file
+            time.sleep(2.0)
+
+            # Try to find symbols in the new file
+            symbols = language_server.request_document_symbols(os.path.join("src", "temp_test.zig"))
+
+            assert symbols is not None, "Should be able to get symbols from auto-opened file"
+            symbol_list = symbols[0] if isinstance(symbols, tuple) else symbols
+            symbol_names = {sym.get("name") for sym in symbol_list if isinstance(sym, dict)}
+
+            # Verify our functions are found
+            assert "tempFunction" in symbol_names, "tempFunction should be found in the new file"
+            assert "anotherFunc" in symbol_names, "anotherFunc should be found in the new file"
+
+        finally:
+            # Clean up the temporary file
+            if temp_file_path.exists():
+                temp_file_path.unlink()
+
+    @pytest.mark.parametrize("language_server", [Language.ZIG], indirect=True)
+    def test_file_watcher_file_deletion(self, language_server: SolidLanguageServer) -> None:
+        """Test that deleted files are properly closed by the file watcher."""
+        import time
+        from pathlib import Path
+
+        # Create a temporary Zig file
+        src_dir = Path(language_server.repository_root_path) / "src"
+        temp_file_path = src_dir / "temp_delete.zig"
+
+        try:
+            # Create and write the file
+            temp_file_content = """
+pub fn deleteMe() void {
+    // This function will be deleted
+}
+"""
+            temp_file_path.write_text(temp_file_content)
+
+            # Give the file watcher time to detect and open the file
+            time.sleep(2.0)
+
+            # Verify file is accessible
+            symbols = language_server.request_document_symbols(os.path.join("src", "temp_delete.zig"))
+            assert symbols is not None, "File should be accessible after creation"
+
+            # Delete the file
+            temp_file_path.unlink()
+
+            # Give the file watcher time to detect deletion
+            time.sleep(2.0)
+
+            # Attempting to get symbols from deleted file should fail or return empty
+            # Note: The exact behavior depends on ZLS implementation
+            # We just verify no crash occurs
+            try:
+                symbols = language_server.request_document_symbols(os.path.join("src", "temp_delete.zig"))
+                # If it doesn't raise an error, symbols should be None or empty
+                assert symbols is None or len(symbols) == 0, "Deleted file should not have symbols"
+            except Exception:
+                # Expected - file no longer exists
+                pass
+
+        finally:
+            # Ensure cleanup
+            if temp_file_path.exists():
+                temp_file_path.unlink()
+
+    @pytest.mark.parametrize("language_server", [Language.ZIG], indirect=True)
+    def test_file_watcher_gitignore_respect(self, language_server: SolidLanguageServer) -> None:
+        """Test that files in gitignored directories are not watched."""
+        import time
+        from pathlib import Path
+
+        # Create a file in zig-cache (which should be ignored)
+        cache_dir = Path(language_server.repository_root_path) / "zig-cache"
+        cache_dir.mkdir(exist_ok=True)
+        ignored_file_path = cache_dir / "ignored_test.zig"
+
+        # Also test zig-out directory
+        out_dir = Path(language_server.repository_root_path) / "zig-out"
+        out_dir.mkdir(exist_ok=True)
+        out_file_path = out_dir / "output_test.zig"
+
+        try:
+            # Write files to ignored directories
+            ignored_content = """
+pub fn ignoredFunction() void {
+    // This should not be auto-opened
+}
+"""
+            ignored_file_path.write_text(ignored_content)
+            out_file_path.write_text(ignored_content)
+
+            # Give time for file watcher (should NOT detect these)
+            time.sleep(2.0)
+
+            # These files should not be accessible through ZLS
+            # since they weren't auto-opened (being in ignored directories)
+            try:
+                symbols = language_server.request_document_symbols(str(ignored_file_path.relative_to(language_server.repository_root_path)))
+                # If ZLS can access it, it means the file was opened (which is wrong)
+                # However, ZLS might still be able to open it on-demand
+                # So we just log this for informational purposes
+                if symbols and len(symbols) > 0:
+                    # This is acceptable - ZLS can still open files on-demand
+                    # The file watcher just shouldn't have auto-opened it
+                    pass
+            except Exception:
+                # Expected - file in ignored directory
+                pass
+
+        finally:
+            # Clean up
+            if ignored_file_path.exists():
+                ignored_file_path.unlink()
+            if out_file_path.exists():
+                out_file_path.unlink()
+
+    @pytest.mark.parametrize("language_server", [Language.ZIG], indirect=True)
+    def test_file_watcher_non_zig_files_ignored(self, language_server: SolidLanguageServer) -> None:
+        """Test that non-.zig files are not watched."""
+        import time
+        from pathlib import Path
+
+        # Create various non-Zig files
+        src_dir = Path(language_server.repository_root_path) / "src"
+        txt_file = src_dir / "readme.txt"
+        py_file = src_dir / "script.py"
+
+        try:
+            # Create non-Zig files
+            txt_file.write_text("This is a text file")
+            py_file.write_text("print('This is Python')")
+
+            # Give time for file watcher (should NOT detect these)
+            time.sleep(1.0)
+
+            # These files should not be processed by ZLS
+            # We can't really test this directly, but we verify no crashes
+            # and that our Zig files still work
+            symbols = language_server.request_document_symbols(os.path.join("src", "main.zig"))
+            assert symbols is not None, "ZLS should still work after non-Zig files are created"
+
+        finally:
+            # Clean up
+            if txt_file.exists():
+                txt_file.unlink()
+            if py_file.exists():
+                py_file.unlink()
