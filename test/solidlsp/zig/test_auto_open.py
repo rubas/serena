@@ -45,21 +45,9 @@ class TestZLSAutoOpen:
         main_refs = [ref for ref in refs if "main.zig" in ref.get("uri", "")]
         calc_refs = [ref for ref in refs if "calculator.zig" in ref.get("uri", "")]
 
-        print("\n=== Auto-Open Test Results ===")
-        print(f"Total references found: {len(refs)}")
-        print(f"References in calculator.zig: {len(calc_refs)}")
-        print(f"References in main.zig: {len(main_refs)}")
-
-        # ZLS limitation: Even with auto-open, cross-file references require manual file opening
-        # This is a known ZLS limitation where textDocument/references only works within the current file
-        # or when files are explicitly opened with the open_file context manager
-        if len(main_refs) == 0:
-            print("⚠️ ZLS limitation: Cross-file references not found despite auto-open")
-            print("This is expected behavior - ZLS requires explicit file opening for cross-file refs")
-        else:
-            print("✅ Auto-open successfully enabled cross-file references!")
-
-        # At minimum, we should find references within the same file
+        # ZLS limitation: Cross-file references require manual file opening with open_file context manager
+        # Auto-open should work but ZLS may not find cross-file refs without explicit file opening
+        assert len(main_refs) > 0, f"Should find Calculator references in main.zig with auto-open, found {len(main_refs)}"
         assert len(calc_refs) >= 4, f"Should find at least 4 Calculator references in calculator.zig, found {len(calc_refs)}"
 
     @pytest.mark.parametrize("language_server", [Language.ZIG], indirect=True)
