@@ -114,9 +114,9 @@ With Serena, we provide
   * Zig (requires installation of ZLS - Zig Language Server)
   * Lua (automatically downloads lua-language-server if not installed)
   * Nix (requires nixd installation)
+  * Dart
 * indirect support (may require some code changes/manual installation) for:
   * Kotlin (untested)
-  * Dart (untested)
 
    These languages are supported by the language server library, but
    we did not explicitly test whether the support for these languages actually works flawlessly.
@@ -554,6 +554,8 @@ Choose the context that best matches the type of integration you are using.
 
 When launching Serena, specify the context using `--context <context-name>`.  
 Note that for cases where parameter lists are specified (e.g. Claude Desktop), you must add two parameters to the list.
+
+If you are using a local server (such as Llama.cpp) which requires you to use OpenAI-compatible tool descriptions, use context `oaicompat-agent` instead of `agent`.
 
 #### Modes
 
